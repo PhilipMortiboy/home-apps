@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Melilou Maker</title>
+<title>Melalou Maker</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Melilou Maker">
+<meta name="apple-mobile-web-app-title" content="Melalou Maker">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="color-scheme" content="light only">
 <meta name="theme-color" content="#F6FAF2">
@@ -115,7 +115,7 @@ textarea { width: 100%; min-height: 90px; font-size: 13px; margin-top: 8px; }
   <header>
     <img src="icon.svg" alt="">
     <div>
-      <h1>Melilou Maker</h1>
+      <h1>Melalou Maker</h1>
       <p class="tagline">Or Little Philip Planner</p>
     </div>
   </header>
@@ -473,7 +473,7 @@ $("do-restore").onclick = () => {
   const err = $("restore-error");
   let next;
   try { next = sanitise(JSON.parse($("restore-text").value)); }
-  catch { err.textContent = "That doesn't look like a Melilou Maker backup. Paste the whole text you copied."; return; }
+  catch { err.textContent = "That doesn't look like a Melalou Maker backup. Paste the whole text you copied."; return; }
   if (state.starts.length && !confirm(`Replace your ${state.starts.length} logged dates with the ${next.starts.length} in this backup?`)) return;
   state = next;
   $("restore-text").value = "";
