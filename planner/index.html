@@ -149,6 +149,7 @@ textarea { width: 100%; min-height: 90px; font-size: 13px; margin-top: 8px; }
     </div>
     <button id="toggle-past" class="hidden" style="width:100%;margin-bottom:12px"></button>
     <div id="calendar"></div>
+    <button id="more-months" style="width:100%">Show next 3 months</button>
   </section>
 
   <section class="card">
@@ -197,7 +198,8 @@ textarea { width: 100%; min-height: 90px; font-size: 13px; margin-top: 8px; }
 const STORE_KEY = "melilou-maker-v1";
 const DEFAULT_CYCLE = 28;
 const MIN_GAP = 15, MAX_GAP = 45;
-const MONTHS_AHEAD = 12, MONTHS_BACK_MAX = 12;
+const MONTHS_STEP = 3, MONTHS_AHEAD_MAX = 24, MONTHS_BACK_MAX = 12;
+let monthsAhead = MONTHS_STEP;
 const PHASE_NAMES = { period: "Period", follicular: "Follicular", ovulation: "Ovulation", luteal: "Luteal" };
 
 // ---------- dates as whole day numbers (UTC based, so no DST surprises) ----------
@@ -358,7 +360,8 @@ function renderCalendar() {
   }
   const startY = y + Math.floor(m / 12), startM = ((m % 12) + 12) % 12;
   const logged = new Set(state.starts.map(toNum));
-  const totalMonths = (now.getUTCFullYear() - startY) * 12 + (now.getUTCMonth() - startM) + MONTHS_AHEAD + 1;
+  const totalMonths = (now.getUTCFullYear() - startY) * 12 + (now.getUTCMonth() - startM) + monthsAhead + 1;
+  $("more-months").classList.toggle("hidden", monthsAhead >= MONTHS_AHEAD_MAX);
   for (let k = 0; k < totalMonths; k++) {
     const yy = startY + Math.floor((startM + k) / 12), mm = (startM + k) % 12;
     const first = Date.UTC(yy, mm, 1) / 864e5;
@@ -404,6 +407,7 @@ function renderSettings() {
 
 function render() { renderToday(); renderLog(); renderSettings(); renderCalendar(); }
 $("toggle-past").onclick = () => { showPast = !showPast; renderCalendar(); };
+$("more-months").onclick = () => { monthsAhead = Math.min(monthsAhead + MONTHS_STEP, MONTHS_AHEAD_MAX); renderCalendar(); };
 document.querySelectorAll("[data-show]").forEach(b => {
   b.onclick = () => { state[b.dataset.show] = !state[b.dataset.show]; save(); renderToday(); renderCalendar(); };
 });
