@@ -24,12 +24,12 @@
   --on-accent: #102A06;
   --danger: #A32D2D;
 
-  /* Dark green is reserved for the fertile outline and peak dot. */
+  /* Gold is reserved for fertility: the fertile outline and peak dot. */
   --period: #5FA53A;      --period-text: #102A06;
   --ovulation: #B9DE7A;   --ovulation-text: #173404;
   --follicular: #EEF7E6;  --follicular-text: #173404;
   --luteal: #F2F6DF;      --luteal-text: #173404;
-  --mark: #163A1F;        --pms: #8A9A3A;
+  --mark: #C9971C;        --pms: #8A9A3A;
   --today: #3A3A38;
   --empty-text: #6F7F68;
 }
@@ -91,8 +91,8 @@ input[type=number] { width: 80px; }
 .day.follicular { background: var(--follicular); color: var(--follicular-text); }
 .day.ovulation { background: var(--ovulation); color: var(--ovulation-text); }
 .day.luteal { background: var(--luteal); color: var(--luteal-text); }
-.day.fertile { box-shadow: inset 0 0 0 2px var(--mark); }
-.day.peak::after { content: ""; position: absolute; bottom: 4px; left: 50%; margin-left: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--mark); }
+.day.fertile { box-shadow: inset 0 0 0 3.5px var(--mark); }
+.day.peak::after { content: ""; position: absolute; bottom: 5px; left: 50%; margin-left: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--mark); }
 .day.pms::before { content: ""; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--pms); }
 .day.today span { background: var(--today); color: #FFFFFF; font-weight: 700; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
 .toggles { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
@@ -138,7 +138,7 @@ textarea { width: 100%; min-height: 90px; font-size: 13px; margin-top: 8px; }
     <div class="legend">
       <span><i class="sw" style="background:var(--period)"></i>Period</span>
       <span><i class="sw" style="background:var(--ovulation)"></i>Ovulation</span>
-      <span><i class="sw" style="box-shadow: inset 0 0 0 2px var(--mark)"></i>Fertile</span>
+      <span><i class="sw" style="box-shadow: inset 0 0 0 3px var(--mark)"></i>Fertile</span>
       <span><i class="sw" style="background:var(--mark);width:8px;height:8px;border-radius:50%"></i>Peak fertility</span>
     </div>
     <div class="toggles">
