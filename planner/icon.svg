@@ -5,8 +5,7 @@
   <ellipse cx="400" cy="290" rx="34" ry="42" fill="#D99D74"/>
   <!-- face -->
   <circle cx="256" cy="282" r="150" fill="#E3AF88"/>
-  <!-- hair: soft dark tuft and curl -->
-  <path d="M150 210 C170 150 230 128 268 136 C320 146 360 176 366 214 C330 186 290 178 256 182 C214 186 180 196 150 210 Z" fill="#3B2416"/>
+  <!-- hair: a single curl on top -->
   <path d="M262 140 C250 104 272 80 300 88 C322 94 324 120 306 128 C294 133 284 122 292 112" fill="none" stroke="#3B2416" stroke-width="14" stroke-linecap="round"/>
   <!-- eyes -->
   <ellipse cx="200" cy="282" rx="22" ry="26" fill="#2A1A10"/>
