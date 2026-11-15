@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#5FA53A"/>
+  <!-- ears -->
+  <ellipse cx="112" cy="290" rx="34" ry="42" fill="#D99D74"/>
+  <ellipse cx="400" cy="290" rx="34" ry="42" fill="#D99D74"/>
+  <!-- face -->
+  <circle cx="256" cy="282" r="150" fill="#E3AF88"/>
+  <!-- hair: soft dark tuft and curl -->
+  <path d="M150 210 C170 150 230 128 268 136 C320 146 360 176 366 214 C330 186 290 178 256 182 C214 186 180 196 150 210 Z" fill="#3B2416"/>
+  <path d="M262 140 C250 104 272 80 300 88 C322 94 324 120 306 128 C294 133 284 122 292 112" fill="none" stroke="#3B2416" stroke-width="14" stroke-linecap="round"/>
+  <!-- eyes -->
+  <ellipse cx="200" cy="282" rx="22" ry="26" fill="#2A1A10"/>
+  <ellipse cx="312" cy="282" rx="22" ry="26" fill="#2A1A10"/>
+  <circle cx="208" cy="272" r="8" fill="#FFFFFF"/>
+  <circle cx="320" cy="272" r="8" fill="#FFFFFF"/>
+  <!-- cheeks -->
+  <ellipse cx="166" cy="334" rx="28" ry="18" fill="#F08F8F" opacity="0.55"/>
+  <ellipse cx="346" cy="334" rx="28" ry="18" fill="#F08F8F" opacity="0.55"/>
+  <!-- nose and smile -->
+  <ellipse cx="256" cy="318" rx="10" ry="7" fill="#C98A62"/>
+  <path d="M222 352 Q256 384 290 352" fill="none" stroke="#7A3E2A" stroke-width="10" stroke-linecap="round"/>
+</svg>

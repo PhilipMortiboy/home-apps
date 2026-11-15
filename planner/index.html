@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Melilou Maker</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Melilou Maker">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="color-scheme" content="light only">
+<meta name="theme-color" content="#F6FAF2">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root {
+  --bg: #F6FAF2;
+  --card: #FFFFFF;
+  --text: #173404;
+  --muted: #4E6545;
+  --line: #D5E4CB;
+  --accent: #5FA53A;
+  --on-accent: #102A06;
+  --danger: #A32D2D;
+
+  /* Dark green is reserved for the fertile outline and peak dot. */
+  --period: #5FA53A;      --period-text: #102A06;
+  --ovulation: #B9DE7A;   --ovulation-text: #173404;
+  --follicular: #EEF7E6;  --follicular-text: #173404;
+  --luteal: #F2F6DF;      --luteal-text: #173404;
+  --mark: #163A1F;        --pms: #8A9A3A;
+  --today: #3A3A38;
+  --empty-text: #6F7F68;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+main { max-width: 520px; margin: 0 auto; padding: 16px; }
+header { display: flex; align-items: center; gap: 12px; margin: 8px 0 16px; }
+header img { width: 48px; height: 48px; border-radius: 12px; }
+h1 { font-size: 22px; margin: 0; line-height: 1.2; font-weight: 600; }
+.tagline { margin: 0; font-size: 13px; color: var(--muted); }
+h2 { font-size: 17px; margin: 0 0 12px; font-weight: 600; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+.big { font-size: 26px; font-weight: 600; line-height: 1.2; margin: 0; }
+.sub { margin: 4px 0 0; color: var(--muted); }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.fact { background: var(--bg); border-radius: 12px; padding: 10px 12px; }
+.fact .label { font-size: 13px; color: var(--muted); }
+.fact .value { font-weight: 600; }
+.phase-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 14px; font-weight: 600; margin-top: 8px; }
+button, .btn {
+  font: inherit; font-size: 15px; border-radius: 10px; padding: 10px 14px; min-height: 44px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer;
+}
+button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; width: 100%; }
+button.link { border: none; background: none; color: var(--muted); padding: 4px 8px; min-height: 0; }
+input[type=date], input[type=number], textarea {
+  font: inherit; font-size: 16px; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-height: 44px;
+}
+input[type=number] { width: 80px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > input[type=date] { flex: 1; min-width: 0; }
+.error { color: var(--danger); font-size: 14px; margin: 6px 0 0; min-height: 0; }
+.log { list-style: none; margin: 12px 0 0; padding: 0; }
+.log li { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.log .gap { color: var(--muted); font-size: 14px; }
+.setting { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.setting:first-of-type { border-top: none; }
+.setting .hint { display: block; font-size: 13px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; position: relative; }
+.month { margin-bottom: 20px; }
+.month h3 { font-size: 15px; margin: 0 0 8px; font-weight: 600; }
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.dow { font-size: 12px; color: var(--muted); text-align: center; }
+.day {
+  position: relative; aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: var(--empty-text);
+}
+.day.period { background: var(--period); color: var(--period-text); }
+.day.follicular { background: var(--follicular); color: var(--follicular-text); }
+.day.ovulation { background: var(--ovulation); color: var(--ovulation-text); }
+.day.luteal { background: var(--luteal); color: var(--luteal-text); }
+.day.fertile { box-shadow: inset 0 0 0 2px var(--mark); }
+.day.peak::after { content: ""; position: absolute; bottom: 4px; left: 50%; margin-left: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--mark); }
+.day.pms::before { content: ""; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--pms); }
+.day.today span { background: var(--today); color: #FFFFFF; font-weight: 700; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+.toggles button { min-height: 36px; padding: 6px 12px; font-size: 14px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.toggles button[aria-pressed="true"] { color: var(--text); border-color: var(--accent); font-weight: 600; }
+.toggles button[aria-pressed="true"]::before { content: "✓"; }
+.day.logged { font-weight: 700; text-decoration: underline; }
+.note { font-size: 13px; color: var(--muted); text-align: center; margin: 8px 0 24px; }
+details summary { cursor: pointer; font-weight: 600; font-size: 17px; list-style: none; }
+details summary::-webkit-details-marker { display: none; }
+details summary::after { content: " ›"; color: var(--muted); }
+details[open] summary::after { content: " ⌄"; }
+details[open] summary { margin-bottom: 12px; }
+textarea { width: 100%; min-height: 90px; font-size: 13px; margin-top: 8px; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icon.svg" alt="">
+    <div>
+      <h1>Melilou Maker</h1>
+      <p class="tagline">Or Little Philip Planner</p>
+    </div>
+  </header>
+
+  <section class="card" id="today"></section>
+
+  <section class="card">
+    <h2>Log a period</h2>
+    <button class="primary" id="started-today">My period started today</button>
+    <div class="row" style="margin-top:12px">
+      <input type="date" id="past-date" aria-label="Period start date">
+      <button id="add-past">Add date</button>
+    </div>
+    <p class="error" id="log-error" role="alert"></p>
+    <ul class="log" id="log"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Calendar</h2>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--period)"></i>Period</span>
+      <span><i class="sw" style="background:var(--ovulation)"></i>Ovulation</span>
+      <span><i class="sw" style="box-shadow: inset 0 0 0 2px var(--mark)"></i>Fertile</span>
+      <span><i class="sw" style="background:var(--mark);width:8px;height:8px;border-radius:50%"></i>Peak fertility</span>
+    </div>
+    <div class="toggles">
+      <span>Also show</span>
+      <button data-show="showFollicular" aria-pressed="false"><i class="sw" style="background:var(--follicular);border:1px solid var(--line)"></i>Follicular</button>
+      <button data-show="showLuteal" aria-pressed="false"><i class="sw" style="background:var(--luteal);border:1px solid var(--line)"></i>Luteal</button>
+      <button data-show="showPms" aria-pressed="false"><i class="sw" style="background:var(--pms);width:8px;height:8px;border-radius:50%"></i>PMS likely</button>
+    </div>
+    <button id="toggle-past" class="hidden" style="width:100%;margin-bottom:12px"></button>
+    <div id="calendar"></div>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>Settings</summary>
+      <div class="setting">
+        <label for="cycle-len">Cycle length<span class="hint" id="cycle-hint"></span></label>
+        <input type="number" id="cycle-len" min="20" max="45" inputmode="numeric" placeholder="auto">
+      </div>
+      <div class="setting">
+        <label for="period-len">Period lasts (days)</label>
+        <input type="number" id="period-len" min="1" max="10" inputmode="numeric">
+      </div>
+      <div class="setting">
+        <label for="pms-days">PMS-likely days before a period<span class="hint">0 hides them</span></label>
+        <input type="number" id="pms-days" min="0" max="10" inputmode="numeric">
+      </div>
+      <p class="error" id="settings-error" role="alert"></p>
+    </details>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>Backup</summary>
+      <p class="sub" style="margin-top:0">Your data is kept only on this phone. Copy a backup now and then, and keep it somewhere safe such as Notes.</p>
+      <div class="row" style="margin-top:12px">
+        <button id="copy-backup">Copy backup</button>
+        <button id="show-restore">Restore a backup</button>
+      </div>
+      <p class="sub" id="backup-msg" role="status"></p>
+      <div id="restore-box" class="hidden">
+        <textarea id="restore-text" placeholder='{"starts":["2026-10-02"]}' aria-label="Backup text"></textarea>
+        <button id="do-restore" style="margin-top:8px">Restore</button>
+        <p class="error" id="restore-error" role="alert"></p>
+      </div>
+      <p class="sub hidden" id="manual-copy-label">Copying isn't available here. Select and copy this text instead:</p>
+      <textarea id="manual-copy" class="hidden" readonly aria-label="Backup text to copy"></textarea>
+    </details>
+  </section>
+
+  <p class="note">Dates are estimates for a regular cycle. Not a method of contraception.</p>
+</main>
+
+<script>
+"use strict";
+const STORE_KEY = "melilou-maker-v1";
+const DEFAULT_CYCLE = 28;
+const MIN_GAP = 15, MAX_GAP = 45;
+const MONTHS_AHEAD = 12, MONTHS_BACK_MAX = 12;
+const PHASE_NAMES = { period: "Period", follicular: "Follicular", ovulation: "Ovulation", luteal: "Luteal" };
+
+// ---------- dates as whole day numbers (UTC based, so no DST surprises) ----------
+const toNum = s => { const [y, m, d] = s.split("-").map(Number); return Date.UTC(y, m - 1, d) / 864e5; };
+const toStr = n => new Date(n * 864e5).toISOString().slice(0, 10);
+const todayNum = () => { const t = new Date(); return Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) / 864e5; };
+const fmt = (n, opts = { day: "numeric", month: "short" }) => new Date(n * 864e5).toLocaleDateString("en-GB", { ...opts, timeZone: "UTC" });
+const fmtRange = (a, b) => {
+  const da = new Date(a * 864e5), db = new Date(b * 864e5);
+  return da.getUTCMonth() === db.getUTCMonth() ? `${da.getUTCDate()}–${fmt(b)}` : `${fmt(a)} – ${fmt(b)}`;
+};
+
+// ---------- storage ----------
+function defaults() { return { starts: [], cycleOverride: null, periodLen: 5, pmsDays: 5, showFollicular: false, showLuteal: false, showPms: false }; }
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    return raw ? sanitise(JSON.parse(raw)) : defaults();
+  } catch { return defaults(); }
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {} }
+function sanitise(obj) {
+  const d = defaults();
+  if (!obj || !Array.isArray(obj.starts)) throw new Error("bad");
+  const starts = [...new Set(obj.starts.filter(s => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(toNum(s))))].sort();
+  const int = (v, lo, hi, dflt) => Number.isInteger(v) && v >= lo && v <= hi ? v : dflt;
+  return {
+    starts,
+    cycleOverride: obj.cycleOverride == null ? null : int(obj.cycleOverride, 20, 45, null),
+    periodLen: int(obj.periodLen, 1, 10, d.periodLen),
+    pmsDays: int(obj.pmsDays, 0, 10, d.pmsDays),
+    showFollicular: obj.showFollicular === true,
+    showLuteal: obj.showLuteal === true,
+    showPms: obj.showPms === true,
+  };
+}
+let state = load();
+
+// ---------- cycle model ----------
+function averageCycle(starts) {
+  const n = starts.map(toNum);
+  const gaps = [];
+  for (let i = 1; i < n.length; i++) {
+    const g = n[i] - n[i - 1];
+    if (g >= MIN_GAP && g <= MAX_GAP) gaps.push(g); // longer gaps are most likely a missed log
+  }
+  return gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null;
+}
+function cycleLength() { return state.cycleOverride || averageCycle(state.starts) || DEFAULT_CYCLE; }
+
+// Which cycle does a day fall in? Returns { start, len } or null.
+function cycleOf(day) {
+  const S = state.starts.map(toNum);
+  if (!S.length || day < S[0]) return null;
+  const L = cycleLength();
+  let i = S.length - 1;
+  while (S[i] > day) i--;
+  if (i < S.length - 1) {
+    const gap = S[i + 1] - S[i];
+    if (gap <= MAX_GAP) return { start: S[i], len: gap };
+    return day - S[i] < L ? { start: S[i], len: L } : null; // unknown stretch between logs
+  }
+  const k = Math.floor((day - S[i]) / L);
+  return { start: S[i] + k * L, len: L };
+}
+
+// Ovulation is taken as 14 days before the next period.
+// Fertile window: the 5 days before ovulation plus ovulation day. Peak: ovulation day and the 2 before.
+function dayInfo(day) {
+  const c = cycleOf(day);
+  if (!c) return null;
+  const cd = day - c.start + 1;
+  const ov = c.len - 14;
+  const P = Math.min(state.periodLen, c.len);
+  let phase;
+  if (cd <= P) phase = "period";
+  else if (cd >= ov - 1 && cd <= ov + 1) phase = "ovulation";
+  else if (cd < ov - 1) phase = "follicular";
+  else phase = "luteal";
+  return {
+    cycle: c, cd, ov, phase,
+    fertile: cd >= ov - 5 && cd <= ov,
+    peak: cd >= ov - 2 && cd <= ov,
+    pms: phase === "luteal" && state.pmsDays > 0 && cd > c.len - state.pmsDays,
+  };
+}
+
+// ---------- rendering ----------
+const $ = id => document.getElementById(id);
+
+function renderToday() {
+  const el = $("today");
+  const t = todayNum();
+  const info = dayInfo(t);
+  if (!info) {
+    el.innerHTML = `<h2>Start with your history</h2>
+      <p class="sub" style="margin:0">Add the start dates of your last few periods below. Three or more give the best projection.</p>`;
+    return;
+  }
+  const { cycle, cd, ov, phase } = info;
+  const nextPeriod = cycle.start + cycle.len;
+  const daysTo = nextPeriod - t;
+  let fertileText;
+  if (cd <= ov) {
+    const a = cycle.start + ov - 6, b = cycle.start + ov - 1;
+    fertileText = info.fertile ? (info.peak ? "Now, peak days" : "Now") : fmtRange(a, b);
+  } else {
+    const L = cycleLength(), o2 = L - 14;
+    fertileText = fmtRange(nextPeriod + o2 - 6, nextPeriod + o2 - 1);
+  }
+  const ovDay = cd <= ov ? cycle.start + ov - 1 : nextPeriod + cycleLength() - 15;
+  el.innerHTML = `
+    <p class="big">Day ${cd} of ${cycle.len}</p>
+    <span class="phase-pill" style="background:var(--${phase});color:var(--${phase}-text)">${PHASE_NAMES[phase]} phase${info.pms && state.showPms ? " · PMS likely" : ""}</span>
+    <div class="facts">
+      <div class="fact"><div class="label">Next period</div><div class="value">${fmt(nextPeriod, { weekday: "short", day: "numeric", month: "short" })}</div><div class="label">in ${daysTo} day${daysTo === 1 ? "" : "s"}</div></div>
+      <div class="fact"><div class="label">Fertile window</div><div class="value">${fertileText}</div><div class="label">ovulation ${fmt(ovDay)}</div></div>
+    </div>`;
+}
+
+function renderLog() {
+  const list = $("log");
+  const starts = [...state.starts].reverse();
+  list.innerHTML = "";
+  starts.forEach((s, i) => {
+    const next = starts[i - 1];
+    const gap = next ? toNum(next) - toNum(s) : null;
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${fmt(toNum(s), { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+      ${gap ? `<span class="gap"> · ${gap}-day cycle</span>` : ""}</span>`;
+    const del = document.createElement("button");
+    del.className = "link";
+    del.textContent = "Remove";
+    del.setAttribute("aria-label", `Remove ${s}`);
+    del.onclick = () => { state.starts = state.starts.filter(x => x !== s); commit(); };
+    li.appendChild(del);
+    list.appendChild(li);
+  });
+}
+
+function renderCalendar() {
+  const cal = $("calendar");
+  cal.innerHTML = "";
+  document.querySelectorAll("[data-show]").forEach(b => {
+    b.setAttribute("aria-pressed", String(state[b.dataset.show]));
+    b.hidden = b.dataset.show === "showPms" && state.pmsDays === 0;
+  });
+  const t = todayNum();
+  const now = new Date(t * 864e5);
+  let y = now.getUTCFullYear(), m = now.getUTCMonth();
+  const pastBtn = $("toggle-past");
+  pastBtn.textContent = showPast ? "Hide earlier months" : "Show earlier months";
+  pastBtn.classList.toggle("hidden", !state.starts.length || toNum(state.starts[0]) >= Date.UTC(y, m, 1) / 864e5);
+  if (state.starts.length && showPast) {
+    const first = new Date(toNum(state.starts[0]) * 864e5);
+    const back = (y - first.getUTCFullYear()) * 12 + (m - first.getUTCMonth());
+    m -= Math.min(Math.max(back, 0), MONTHS_BACK_MAX);
+  }
+  const startY = y + Math.floor(m / 12), startM = ((m % 12) + 12) % 12;
+  const logged = new Set(state.starts.map(toNum));
+  const totalMonths = (now.getUTCFullYear() - startY) * 12 + (now.getUTCMonth() - startM) + MONTHS_AHEAD + 1;
+  for (let k = 0; k < totalMonths; k++) {
+    const yy = startY + Math.floor((startM + k) / 12), mm = (startM + k) % 12;
+    const first = Date.UTC(yy, mm, 1) / 864e5;
+    const daysIn = new Date(Date.UTC(yy, mm + 1, 0)).getUTCDate();
+    const lead = (new Date(first * 864e5).getUTCDay() + 6) % 7; // Monday first
+    const wrap = document.createElement("div");
+    wrap.className = "month";
+    let html = `<h3>${new Date(first * 864e5).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}</h3><div class="grid">`;
+    html += ["M", "T", "W", "T", "F", "S", "S"].map(d => `<div class="dow">${d}</div>`).join("");
+    html += "<div></div>".repeat(lead);
+    for (let d = 0; d < daysIn; d++) {
+      const n = first + d, info = dayInfo(n);
+      const cls = ["day"];
+      let label = fmt(n, { day: "numeric", month: "long" });
+      if (info) {
+        const shown = info.phase === "period" || info.phase === "ovulation"
+          || (info.phase === "follicular" && state.showFollicular)
+          || (info.phase === "luteal" && state.showLuteal);
+        const pms = info.pms && state.showPms;
+        if (shown) { cls.push(info.phase); label += `, ${PHASE_NAMES[info.phase]}`; }
+        if (info.fertile) cls.push("fertile");
+        if (info.peak) cls.push("peak");
+        if (pms) cls.push("pms");
+        label += `${info.peak ? ", peak fertility" : info.fertile ? ", fertile" : ""}${pms ? ", PMS likely" : ""}`;
+      }
+      if (n === t) { cls.push("today"); label += ", today"; }
+      if (logged.has(n)) { cls.push("logged"); label += ", logged period start"; }
+      html += `<div class="${cls.join(" ")}" aria-label="${label}"><span>${d + 1}</span></div>`;
+    }
+    wrap.innerHTML = html + "</div>";
+    cal.appendChild(wrap);
+  }
+}
+let showPast = false;
+
+function renderSettings() {
+  const avg = averageCycle(state.starts);
+  $("cycle-hint").textContent = avg ? `Leave blank to use your average (${avg} days)` : `Leave blank to use ${DEFAULT_CYCLE} days until you've logged two periods`;
+  $("cycle-len").value = state.cycleOverride ?? "";
+  $("period-len").value = state.periodLen;
+  $("pms-days").value = state.pmsDays;
+}
+
+function render() { renderToday(); renderLog(); renderSettings(); renderCalendar(); }
+$("toggle-past").onclick = () => { showPast = !showPast; renderCalendar(); };
+document.querySelectorAll("[data-show]").forEach(b => {
+  b.onclick = () => { state[b.dataset.show] = !state[b.dataset.show]; save(); renderToday(); renderCalendar(); };
+});
+function commit() { save(); render(); }
+
+// ---------- logging ----------
+function addStart(s) {
+  const err = $("log-error");
+  err.textContent = "";
+  if (!s) { err.textContent = "Pick a date first."; return; }
+  const n = toNum(s);
+  if (n > todayNum()) { err.textContent = "That date is in the future."; return; }
+  if (state.starts.includes(s)) { err.textContent = "That date is already logged."; return; }
+  const close = state.starts.find(x => Math.abs(toNum(x) - n) < 10);
+  if (close) { err.textContent = `That's within 10 days of ${fmt(toNum(close))}. Remove that one first if it was wrong.`; return; }
+  state.starts = [...state.starts, s].sort();
+  $("past-date").value = "";
+  commit();
+}
+$("started-today").onclick = () => addStart(toStr(todayNum()));
+$("add-past").onclick = () => addStart($("past-date").value);
+$("past-date").max = toStr(todayNum());
+$("past-date").oninput = () => { $("log-error").textContent = ""; };
+
+// ---------- settings ----------
+function readSetting(id, lo, hi, allowBlank) {
+  const v = $(id).value.trim();
+  if (v === "" && allowBlank) return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= lo && n <= hi ? n : undefined;
+}
+function onSettingChange() {
+  const err = $("settings-error");
+  const cyc = readSetting("cycle-len", 20, 45, true);
+  const per = readSetting("period-len", 1, 10, false);
+  const pms = readSetting("pms-days", 0, 10, false);
+  if (cyc === undefined) { err.textContent = "Cycle length must be 20 to 45 days, or blank."; return; }
+  if (per === undefined) { err.textContent = "Period length must be 1 to 10 days."; return; }
+  if (pms === undefined) { err.textContent = "PMS days must be 0 to 10."; return; }
+  err.textContent = "";
+  state.cycleOverride = cyc; state.periodLen = per; state.pmsDays = pms;
+  save(); renderToday(); renderCalendar();
+}
+["cycle-len", "period-len", "pms-days"].forEach(id => $(id).addEventListener("change", onSettingChange));
+
+// ---------- backup ----------
+$("copy-backup").onclick = async () => {
+  const text = JSON.stringify(state);
+  try {
+    await navigator.clipboard.writeText(text);
+    $("backup-msg").textContent = "Backup copied. Paste it into Notes to keep it safe.";
+  } catch {
+    $("manual-copy-label").classList.remove("hidden");
+    const ta = $("manual-copy");
+    ta.classList.remove("hidden");
+    ta.value = text;
+    ta.select();
+  }
+};
+$("show-restore").onclick = () => $("restore-box").classList.toggle("hidden");
+$("restore-text").oninput = () => { $("restore-error").textContent = ""; };
+$("do-restore").onclick = () => {
+  const err = $("restore-error");
+  let next;
+  try { next = sanitise(JSON.parse($("restore-text").value)); }
+  catch { err.textContent = "That doesn't look like a Melilou Maker backup. Paste the whole text you copied."; return; }
+  if (state.starts.length && !confirm(`Replace your ${state.starts.length} logged dates with the ${next.starts.length} in this backup?`)) return;
+  state = next;
+  $("restore-text").value = "";
+  $("restore-box").classList.add("hidden");
+  $("backup-msg").textContent = `Restored ${state.starts.length} dates.`;
+  commit();
+};
+
+// ---------- start ----------
+render();
+// Re-render when the app is reopened on a new day.
+let lastDay = todayNum();
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && todayNum() !== lastDay) { lastDay = todayNum(); $("past-date").max = toStr(lastDay); render(); }
+});
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
