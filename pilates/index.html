@@ -515,6 +515,7 @@
     if (!state.sound || !actx) return;
     try {
       if (kind === "tick") tone(880, 0, 0.14, 0.5, "triangle");
+      else if (kind === "start") { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.16, 1.4, 0.55)); }  // lesson begins: rising chord
       else if (kind === "rest") { tone(660, 0, 0.9, 0.6); tone(523, 0.18, 1.1, 0.55); }  // work finished
       else { tone(1319, 0, 1.6, 0.8); tone(2638, 0, 0.8, 0.18); tone(1976, 0, 1.2, 0.14); }  // ding: exercise starts
     } catch (e) {}
@@ -563,6 +564,7 @@
     keepAwake();
     enterStep(0, true);
     play();
+    sound("start");
   }
   function stepEx(s) { return byId[P.lesson.items[s.i].e]; }
   function enterStep(i, announce) {
