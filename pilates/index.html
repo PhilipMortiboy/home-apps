@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<meta name="theme-color" content="#F4EEE3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Training">
+<title>Tresza's Training</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #F4EEE3;        /* sand */
+    --card: #FFFCF6;
+    --line: #E4DACA;
+    --sand: #E9DFCC;
+    --sage: #7E9C80;
+    --sage-dk: #56735A;
+    --sage-lt: #DCE6D8;
+    --ink: #2E3830;
+    --muted: #6D776D;
+    --warn: #A4643F;
+    --r: 18px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+  .wrap {
+    max-width: 560px; margin: 0 auto;
+    padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 28px);
+  }
+  [hidden] { display: none !important; }
+  h1 { font-size: 28px; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 22px; line-height: 1.2; margin: 0; }
+  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 26px 0 10px; font-weight: 600; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 14px; }
+
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .date { color: var(--muted); font-size: 15px; margin-top: 4px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; }
+  .chip { display: inline-block; font-size: 13px; font-weight: 600; color: var(--sage-dk); background: var(--sage-lt); border-radius: 999px; padding: 3px 10px; }
+  .fig { width: 100%; }
+  .fig svg { display: block; width: 100%; height: auto; }
+
+  .today .fig { margin: 6px 0 2px; height: 128px; }
+  .today .fig svg { height: 100%; }
+  .today h2 { margin-top: 10px; font-size: 26px; }
+  .today .blurb { margin-top: 6px; color: var(--muted); }
+  .meta { display: flex; gap: 14px; margin-top: 10px; color: var(--muted); font-size: 14px; }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+    min-height: 54px; border-radius: 14px; font-weight: 650; font-size: 18px;
+    background: var(--sage-dk); color: #fff; margin-top: 16px;
+  }
+  .btn:active { transform: scale(.985); }
+  .btn.ghost { background: transparent; color: var(--sage-dk); border: 1.5px solid var(--sage); font-size: 16px; min-height: 48px; font-weight: 600; }
+  .btn.quiet { background: var(--sand); color: var(--ink); font-size: 16px; min-height: 48px; font-weight: 600; }
+  .link { color: var(--sage-dk); font-weight: 600; min-height: 44px; padding: 0 4px; }
+
+  .done-tick { width: 52px; height: 52px; border-radius: 50%; background: var(--sage); color: #fff; display: grid; place-items: center; font-size: 28px; font-weight: 700; }
+  .done-head { display: flex; align-items: center; gap: 14px; }
+
+  .week { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+  .dots { display: flex; gap: 6px; }
+  .dot { width: 26px; text-align: center; font-size: 11px; color: var(--muted); }
+  .dot i { display: block; width: 22px; height: 22px; margin: 0 auto 3px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); }
+  .dot.on i { background: var(--sage); border-color: var(--sage); }
+  .dot.now { color: var(--ink); font-weight: 700; }
+  .count b { font-size: 26px; display: block; line-height: 1.1; }
+  .count span { white-space: nowrap; }
+
+  .row { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .thumb { flex: 0 0 92px; width: 92px; background: #fff; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; }
+  .thumb svg { display: block; width: 100%; height: auto; }
+  .row .body { flex: 1; min-width: 0; }
+  .row .name { font-weight: 600; }
+  .row .sub { color: var(--muted); font-size: 14px; }
+
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px; margin: 0 -16px; padding-left: 16px; padding-right: 16px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .fchip { flex: 0 0 auto; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); font-size: 15px; font-weight: 600; color: var(--muted); }
+  .fchip[aria-pressed="true"] { background: var(--sage-dk); border-color: var(--sage-dk); color: #fff; }
+
+  .lcard { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 12px; margin-top: 10px; }
+  .lcard .thumb { flex-basis: 96px; width: 96px; }
+  .lcard .title { font-weight: 650; font-size: 17px; }
+  .lcard .when { font-size: 13px; color: var(--sage-dk); font-weight: 600; margin-top: 2px; }
+
+  .back { display: flex; width: fit-content; align-items: center; gap: 4px; min-height: 44px; color: var(--sage-dk); font-weight: 600; margin: -8px 0 6px -4px; padding: 0 4px; }
+  .sticky-foot { position: sticky; bottom: 0; padding: 12px 0 calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(to bottom, rgba(244,238,227,0), var(--bg) 30%); margin-top: 8px; }
+
+  .note { font-size: 14px; color: var(--muted); background: var(--sand); border-radius: 14px; padding: 12px 14px; margin-top: 16px; }
+
+  .toggle { display: flex; align-items: center; justify-content: space-between; min-height: 52px; border-top: 1px solid var(--line); }
+  .toggle:first-child { border-top: 0; }
+  .switch { position: relative; width: 52px; height: 32px; border-radius: 16px; background: var(--line); transition: background .2s; flex: 0 0 auto; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .2s; }
+  .switch[aria-checked="true"] { background: var(--sage); }
+  .switch[aria-checked="true"]::after { transform: translateX(20px); }
+  textarea { width: 100%; min-height: 110px; font: 16px/1.4 ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: #fff; color: var(--ink); margin-top: 10px; }
+  .msg { font-size: 14px; margin-top: 8px; color: var(--sage-dk); }
+  .msg.err { color: var(--warn); }
+  .btnrow { display: flex; gap: 10px; }
+  .btnrow .btn { margin-top: 10px; }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; z-index: 5; }
+  .p-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(env(safe-area-inset-top) + 6px) 12px 0; max-width: 560px; width: 100%; margin: 0 auto; }
+  .p-x { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 24px; color: var(--muted); }
+  .p-prog { flex: 1; text-align: center; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .bar { height: 4px; background: var(--line); border-radius: 2px; margin: 6px 16px 0; max-width: 528px; align-self: center; width: calc(100% - 32px); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--sage); transition: width .3s linear; }
+  .p-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .p-inner { max-width: 560px; margin: 0 auto; padding: 4px 16px 20px; }
+  .p-fig { background: #fff; border: 1px solid var(--line); border-radius: var(--r); padding: 4px 4px 0; position: relative; }
+  .p-fig svg { height: 210px; }
+  .p-fig .side { position: absolute; top: 10px; right: 12px; font-size: 13px; font-weight: 600; color: var(--sage-dk); background: var(--sage-lt); border-radius: 999px; padding: 2px 10px; }
+  .p-now { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+  .ring { flex: 0 0 104px; width: 104px; height: 104px; position: relative; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring .num { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .phase { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--sage-dk); }
+  .phase.rest { color: var(--warn); }
+  .p-name { font-size: 23px; font-weight: 700; line-height: 1.2; margin-top: 2px; }
+  .p-reps { color: var(--muted); margin-top: 3px; font-size: 15px; }
+  .steps { margin-top: 16px; }
+  .steps dt { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 12px; }
+  .steps dd { margin: 2px 0 0; }
+  .steps .easy { background: var(--sage-lt); border-radius: 12px; padding: 10px 12px; margin-top: 14px; }
+  .steps .easy dt { margin-top: 0; color: var(--sage-dk); }
+  .p-ctrl { display: flex; align-items: center; justify-content: center; gap: 28px; padding: 10px 16px calc(env(safe-area-inset-bottom) + 12px); border-top: 1px solid var(--line); background: var(--card); }
+  .cbtn { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--sand); }
+  .cbtn.main { width: 72px; height: 72px; background: var(--sage-dk); color: #fff; }
+  .cbtn svg { width: 26px; height: 26px; fill: currentColor; }
+  .cbtn.main svg { width: 32px; height: 32px; }
+  .cbtn small { display: none; }
+
+  .finish { text-align: center; padding-top: 40px; }
+  .finish .done-tick { width: 84px; height: 84px; font-size: 44px; margin: 0 auto 18px; }
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<main id="home" class="wrap">
+  <div class="top">
+    <div>
+      <h1>Tresza's Training</h1>
+      <div class="date" id="todayDate"></div>
+    </div>
+  </div>
+
+  <section id="todayCard"></section>
+
+  <div class="week card" style="margin-top:14px">
+    <div class="count"><b id="weekCount">0</b><span class="small muted" id="weekLabel">this week</span></div>
+    <div class="dots" id="weekDots"></div>
+  </div>
+
+  <button class="btn ghost" id="openLibrary">Browse all lessons</button>
+
+  <h3>Settings</h3>
+  <div class="card" style="padding:4px 16px">
+    <div class="toggle"><span>Spoken “Next” cues</span><button class="switch" role="switch" id="tVoice" aria-label="Spoken cues"></button></div>
+    <div class="toggle"><span>Chimes and countdown ticks</span><button class="switch" role="switch" id="tSound" aria-label="Chimes"></button></div>
+  </div>
+
+  <h3>Backup</h3>
+  <div class="card">
+    <p class="small muted">Your history is stored only on this phone. Copy a backup now and then, and keep it somewhere safe (for example, in Notes).</p>
+    <div class="btnrow">
+      <button class="btn quiet" id="copyBackup">Copy backup</button>
+      <button class="btn quiet" id="showRestore">Restore</button>
+    </div>
+    <div id="backupOut" hidden>
+      <textarea id="backupText" readonly aria-label="Backup text"></textarea>
+      <div class="msg">Select all of the text above and copy it.</div>
+    </div>
+    <div id="restoreBox" hidden>
+      <textarea id="restoreText" placeholder="Paste a backup here" aria-label="Paste a backup"></textarea>
+      <button class="btn" id="doRestore">Restore this backup</button>
+    </div>
+    <div class="msg" id="backupMsg" hidden></div>
+  </div>
+
+  <p class="note">Stop if anything hurts and use the easier option. If you're pregnant, have recently had surgery or have a back or bone condition, check with your GP or physiotherapist before starting.</p>
+</main>
+
+<!-- LIBRARY -->
+<main id="library" class="wrap" hidden>
+  <button class="back" data-go="home">‹ Home</button>
+  <h1>All lessons</h1>
+  <p class="muted" style="margin-top:4px">15 minutes each. Any lesson you finish counts as today's.</p>
+  <div class="chips" id="filters" role="group" aria-label="Filter by type" style="margin-top:14px"></div>
+  <div id="libList"></div>
+</main>
+
+<!-- OVERVIEW -->
+<main id="overview" class="wrap" hidden>
+  <button class="back" id="ovBack">‹ Back</button>
+  <span class="chip" id="ovCat"></span>
+  <h1 id="ovTitle" style="margin-top:8px"></h1>
+  <p class="muted" id="ovBlurb" style="margin-top:6px"></p>
+  <div class="meta" id="ovMeta"></div>
+  <div class="card" style="margin-top:16px; padding:4px 14px" id="ovList"></div>
+  <p class="note">Stop if anything hurts and use the easier option shown for each exercise.</p>
+  <div class="sticky-foot"><button class="btn" id="ovBegin" style="margin-top:0">Begin</button></div>
+</main>
+
+<!-- FINISHED -->
+<main id="finished" class="wrap" hidden>
+  <div class="finish">
+    <div class="done-tick">✓</div>
+    <h1>Lesson complete</h1>
+    <p class="muted" id="finTitle" style="margin-top:8px"></p>
+    <p style="margin-top:18px" id="finWeek"></p>
+  </div>
+  <button class="btn" data-go="home">Back to home</button>
+</main>
+
+<!-- PLAYER -->
+<div id="player" hidden>
+  <div class="p-top">
+    <button class="p-x" id="pQuit" aria-label="End lesson">✕</button>
+    <div class="p-prog" id="pProg"></div>
+    <div style="width:44px"></div>
+  </div>
+  <div class="bar"><i id="pBar"></i></div>
+  <div class="p-scroll" id="pScroll">
+    <div class="p-inner">
+      <div class="p-fig"><div class="fig" id="pFig"></div><span class="side" id="pSide" hidden></span></div>
+      <div class="p-now">
+        <div class="ring">
+          <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#E4DACA" stroke-width="8"/><circle id="pArc" cx="50" cy="50" r="44" fill="none" stroke="#7E9C80" stroke-width="8" stroke-linecap="round" stroke-dasharray="276.46" stroke-dashoffset="0"/></svg>
+          <div class="num" id="pNum">0</div>
+        </div>
+        <div style="min-width:0">
+          <div class="phase" id="pPhase"></div>
+          <div class="p-name" id="pName"></div>
+          <div class="p-reps" id="pReps"></div>
+        </div>
+      </div>
+      <dl class="steps" id="pSteps"></dl>
+    </div>
+  </div>
+  <div class="p-ctrl">
+    <button class="cbtn" id="pPrev" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9.5 12z"/></svg></button>
+    <button class="cbtn main" id="pPlay" aria-label="Pause"></button>
+    <button class="cbtn" id="pNext" aria-label="Skip"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l10.5-7z"/></svg></button>
+  </div>
+</div>
+
+<script src="figure.js"></script>
+<script src="exercises.js"></script>
+<script>
+(function () {
+  "use strict";
+  const { lessons, byId, cats, steps: buildSteps } = window.LIB;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const catName = id => (cats.find(c => c.id === id) || {}).name || id;
+  const lessonById = id => lessons.find(l => l.id === id);
+
+  // ---------- storage (never rename this key) ----------
+  const KEY = "tresza-training-v1";
+  const blank = () => ({ v: 1, history: [], voice: true, sound: true });
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY));
+      if (s && Array.isArray(s.history)) return { ...blank(), ...s };
+    } catch (e) {}
+    return blank();
+  }
+  let state = load();
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  // ---------- dates (UTC day numbers of the local calendar date) ----------
+  const dayNum = d => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5;
+  const today = () => dayNum(new Date());
+  const weekStart = () => { const d = new Date(); return today() - ((d.getDay() + 6) % 7); };
+  function ago(day) {
+    const n = today() - day;
+    return n <= 0 ? "Done today" : n === 1 ? "Done yesterday" : n < 14 ? `Done ${n} days ago` : `Done ${Math.round(n / 7)} weeks ago`;
+  }
+  const lastDone = id => state.history.reduce((m, h) => h.id === id && h.ts > (m ? m.ts : -1) ? h : m, null);
+
+  // ---------- rotation ----------
+  // Next category after the last completed lesson's; within it, the lesson done longest ago.
+  function pickNext(history) {
+    const order = cats.map(c => c.id);
+    const last = history.length ? history.reduce((a, b) => (b.ts > a.ts ? b : a)) : null;
+    const lastLesson = last && lessonById(last.id);
+    const cat = lastLesson ? order[(order.indexOf(lastLesson.cat) + 1) % order.length] : order[0];
+    const whenDone = id => history.reduce((m, h) => (h.id === id ? Math.max(m, h.ts) : m), -1);
+    return lessons.filter(l => l.cat === cat)
+      .map((l, i) => ({ l, i, t: whenDone(l.id) }))
+      .sort((a, b) => a.t - b.t || a.i - b.i)[0].l;
+  }
+  function doneToday() {
+    const t = today();
+    const todays = state.history.filter(h => h.date === t);
+    return todays.length ? todays.reduce((a, b) => (b.ts > a.ts ? b : a)) : null;
+  }
+
+  // ---------- small renderers ----------
+  // each lesson's featured exercise: the first main-section exercise no earlier lesson features
+  const featured = {};
+  { const used = new Set();
+    lessons.forEach(l => {
+      const main = l.items.slice(3, -2).map(it => it.e);
+      const pick = main.find(e => !used.has(e)) || main[0] || l.items[0].e;
+      used.add(pick); featured[l.id] = pick;
+    }); }
+  const sigEx = l => byId[featured[l.id]];
+  const thumb = ex => `<div class="thumb" aria-hidden="true">${Figure.still(ex)}</div>`;
+  const mins = s => `${Math.round(s / 60)} min`;
+  const fmt = s => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+
+  // ---------- navigation ----------
+  const views = ["home", "library", "overview", "finished"];
+  let overviewFrom = "home";
+  function show(v) {
+    views.forEach(id => { $(id).hidden = id !== v; });
+    $("player").hidden = true;
+    if (v === "home") renderHome();
+    if (v === "library") renderLibrary();
+    window.scrollTo(0, 0);
+  }
+  document.addEventListener("click", e => {
+    const g = e.target.closest("[data-go]");
+    if (g) show(g.dataset.go);
+    const o = e.target.closest("[data-lesson]");
+    if (o) openOverview(o.dataset.lesson, o.dataset.from || "home");
+  });
+
+  // ---------- home ----------
+  function renderHome() {
+    $("todayDate").textContent = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+    const done = doneToday();
+    const el = $("todayCard");
+    if (done) {
+      const dl = lessonById(done.id), next = pickNext(state.history);
+      el.innerHTML = `
+        <div class="card">
+          <div class="done-head"><div class="done-tick">✓</div>
+            <div><h2>Done for today</h2><p class="muted small">${esc(dl ? dl.title : "Lesson")} · ${esc(dl ? catName(dl.cat) : "")}</p></div></div>
+        </div>
+        <div class="card lcard" style="margin-top:12px">
+          ${thumb(sigEx(next))}
+          <div class="body"><div class="small muted">Tomorrow</div><div class="title">${esc(next.title)}</div><div class="small muted">${esc(catName(next.cat))}</div></div>
+        </div>`;
+    } else {
+      const l = pickNext(state.history);
+      el.innerHTML = `
+        <div class="card today">
+          <span class="chip">Today · ${esc(catName(l.cat))}</span>
+          <div class="fig" aria-hidden="true">${Figure.still(sigEx(l)).replace("<svg ", '<svg preserveAspectRatio="xMidYMax meet" ')}</div>
+          <h2>${esc(l.title)}</h2>
+          <p class="blurb">${esc(l.blurb)}</p>
+          <div class="meta"><span>15 min</span><span>${l.items.length} exercises</span></div>
+          <button class="btn" data-lesson="${l.id}" data-from="home">Start today's lesson</button>
+        </div>`;
+    }
+    // week
+    const ws = weekStart(), t = today();
+    const inWeek = state.history.filter(h => h.date >= ws && h.date <= t);
+    $("weekCount").textContent = inWeek.length;
+    $("weekLabel").textContent = "this week";
+    const days = new Set(inWeek.map(h => h.date));
+    $("weekDots").innerHTML = ["M", "T", "W", "T", "F", "S", "S"].map((d, i) =>
+      `<div class="dot${days.has(ws + i) ? " on" : ""}${ws + i === t ? " now" : ""}"><i></i>${d}</div>`).join("");
+    setSwitch("tVoice", state.voice); setSwitch("tSound", state.sound);
+  }
+  $("openLibrary").onclick = () => show("library");
+
+  // ---------- settings ----------
+  function setSwitch(id, on) { $(id).setAttribute("aria-checked", on ? "true" : "false"); }
+  $("tVoice").onclick = () => { state.voice = !state.voice; save(); setSwitch("tVoice", state.voice); };
+  $("tSound").onclick = () => { state.sound = !state.sound; save(); setSwitch("tSound", state.sound); };
+
+  // ---------- backup ----------
+  function backupMsg(t, err) { const m = $("backupMsg"); m.hidden = !t; m.textContent = t || ""; m.classList.toggle("err", !!err); }
+  $("copyBackup").onclick = async () => {
+    const text = JSON.stringify({ app: "tresza-training", ...state });
+    $("restoreBox").hidden = true;
+    try {
+      await navigator.clipboard.writeText(text);
+      $("backupOut").hidden = true;
+      backupMsg(`Backup copied (${state.history.length} lessons). Paste it somewhere safe.`);
+    } catch (e) {
+      $("backupText").value = text; $("backupOut").hidden = false; backupMsg("");
+      $("backupText").focus(); $("backupText").select();
+    }
+  };
+  $("showRestore").onclick = () => { $("backupOut").hidden = true; $("restoreBox").hidden = !$("restoreBox").hidden; backupMsg(""); };
+  $("doRestore").onclick = () => {
+    let data;
+    try { data = JSON.parse($("restoreText").value.trim()); } catch (e) { return backupMsg("That doesn't look like a backup. Paste the whole text.", true); }
+    const ok = data && Array.isArray(data.history) &&
+      data.history.every(h => h && typeof h.id === "string" && Number.isFinite(h.date) && Number.isFinite(h.ts));
+    if (!ok) return backupMsg("That doesn't look like a backup from this app.", true);
+    if (!confirm(`Replace this phone's history (${state.history.length} lessons) with the backup (${data.history.length} lessons)?`)) return;
+    state = { ...blank(), history: data.history, voice: data.voice !== false, sound: data.sound !== false };
+    save(); $("restoreText").value = ""; $("restoreBox").hidden = true;
+    renderHome(); backupMsg(`Restored ${data.history.length} lessons.`);
+  };
+
+  // ---------- library ----------
+  let filter = "all";
+  function renderLibrary() {
+    $("filters").innerHTML = [{ id: "all", name: "All" }, ...cats].map(c =>
+      `<button class="fchip" data-f="${c.id}" aria-pressed="${filter === c.id}">${esc(c.name)}</button>`).join("");
+    const list = lessons.filter(l => filter === "all" || l.cat === filter);
+    $("libList").innerHTML = list.map(l => {
+      const d = lastDone(l.id);
+      return `<button class="card lcard" data-lesson="${l.id}" data-from="library">
+        ${thumb(sigEx(l))}
+        <div class="body"><div class="small muted">${esc(catName(l.cat))}</div><div class="title">${esc(l.title)}</div>
+        <div class="small muted">${esc(l.blurb)}</div>${d ? `<div class="when">✓ ${ago(d.date)}</div>` : ""}</div>
+      </button>`;
+    }).join("");
+  }
+  $("filters").addEventListener("click", e => {
+    const b = e.target.closest("[data-f]");
+    if (b) { filter = b.dataset.f; renderLibrary(); }
+  });
+
+  // ---------- overview ----------
+  let current = null;
+  function openOverview(id, from) {
+    current = lessonById(id); overviewFrom = from;
+    views.forEach(v => { $(v).hidden = v !== "overview"; });
+    $("ovBack").textContent = from === "library" ? "‹ All lessons" : "‹ Home";
+    $("ovCat").textContent = catName(current.cat);
+    $("ovTitle").textContent = current.title;
+    $("ovBlurb").textContent = current.blurb;
+    const d = lastDone(id);
+    $("ovMeta").innerHTML = `<span>15 min</span><span>${current.items.length} exercises</span>${d ? `<span>✓ ${ago(d.date)}</span>` : ""}`;
+    $("ovList").innerHTML = current.items.map(it => {
+      const ex = byId[it.e];
+      const time = ex.sides ? `${it.s}s each side` : `${it.s}s`;
+      const what = ex.type === "hold" ? "Hold" : (it.r || ex.reps);
+      return `<div class="row">${thumb(ex)}<div class="body"><div class="name">${esc(ex.name)}</div><div class="sub">${esc(what)} · ${time}</div></div></div>`;
+    }).join("");
+    window.scrollTo(0, 0);
+  }
+  $("ovBack").onclick = () => show(overviewFrom);
+  $("ovBegin").onclick = () => startLesson(current);
+
+  // ---------- sound and voice ----------
+  let actx = null;
+  function unlockAudio() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === "suspended") actx.resume();
+    } catch (e) { actx = null; }
+    try { if ("speechSynthesis" in window) { const u = new SpeechSynthesisUtterance(""); u.volume = 0; speechSynthesis.speak(u); } } catch (e) {}
+  }
+  function tone(freq, start, dur, vol) {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = "sine"; o.frequency.value = freq;
+    const t0 = actx.currentTime + start;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  function sound(kind) {
+    if (!state.sound || !actx) return;
+    try {
+      if (kind === "tick") tone(880, 0, 0.12, 0.18);
+      else if (kind === "rest") { tone(660, 0, 0.9, 0.22); tone(523, 0.18, 1.1, 0.2); }  // work finished
+      else { tone(784, 0, 0.7, 0.22); tone(1047, 0.14, 0.9, 0.2); }                       // go
+    } catch (e) {}
+  }
+  let enVoice = null;
+  function pickVoice() {
+    try { const vs = speechSynthesis.getVoices(); enVoice = vs.find(v => v.lang === "en-GB") || vs.find(v => /^en/.test(v.lang)) || null; } catch (e) {}
+  }
+  if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+  function say(text) {
+    if (!state.voice || !("speechSynthesis" in window)) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "en-GB"; if (enVoice) u.voice = enVoice; u.rate = 0.95;
+      speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+
+  // ---------- wake lock ----------
+  let wake = null;
+  async function keepAwake() {
+    try { if ("wakeLock" in navigator && !wake) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => { wake = null; }); } } catch (e) { wake = null; }
+  }
+  function releaseWake() { try { wake && wake.release(); } catch (e) {} wake = null; }
+
+  // ---------- player ----------
+  const P = { lesson: null, steps: [], idx: 0, left: 0, endAt: 0, running: false, timer: 0, fig: null, figKey: "", lastSec: null };
+  const ARC = 276.46;
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+  const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M7 4.5v15L19.5 12z"/></svg>';
+
+  function startLesson(l) {
+    unlockAudio();
+    P.lesson = l; P.steps = buildSteps(l); P.idx = 0; P.figKey = "";
+    views.forEach(v => { $(v).hidden = true; });
+    $("player").hidden = false;
+    keepAwake();
+    enterStep(0, true);
+    play();
+  }
+  function stepEx(s) { return byId[P.lesson.items[s.i].e]; }
+  function enterStep(i, announce) {
+    P.idx = i;
+    const s = P.steps[i];
+    P.left = s.secs * 1000; P.lastSec = null;
+    if (P.running) P.endAt = performance.now() + P.left;
+    renderStep();
+    if (announce) {
+      const ex = stepEx(s);
+      if (s.kind === "ready" || s.kind === "rest") say(`Next: ${ex.name}${ex.sides ? ", first side" : ""}`);
+      else if (s.kind === "switch") say("Switch sides");
+    }
+  }
+  function renderStep() {
+    const s = P.steps[P.idx], ex = stepEx(s), item = P.lesson.items[s.i];
+    const mirror = (s.kind === "work" && s.side === 2) || s.kind === "switch";
+    const key = ex.id + (mirror ? ":m" : "");
+    if (key !== P.figKey) {
+      if (P.fig) P.fig.stop();
+      P.fig = Figure.mount($("pFig"), ex, { mirror, paused: !P.running });
+      P.figKey = key;
+      $("pScroll").scrollTop = 0;
+    }
+    const labels = { ready: "Get ready", rest: "Rest · next up", switch: "Switch sides", work: ex.type === "hold" ? "Hold" : "Reps" };
+    $("pPhase").textContent = labels[s.kind];
+    $("pPhase").classList.toggle("rest", s.kind !== "work");
+    $("pName").textContent = ex.name;
+    const each = ex.sides ? " each side" : "";
+    $("pReps").textContent = ex.type === "hold"
+      ? (item.r || (ex.reps && !/rep/i.test(ex.reps) ? ex.reps : `Hold for ${item.s} seconds${each}`))
+      : `${item.r || ex.reps} in ${item.s} seconds${each}`;
+    const side = s.kind === "work" && s.side ? `Side ${s.side} of 2` : s.kind === "switch" ? "Side 2 next" : (ex.sides ? "Both sides" : "");
+    $("pSide").hidden = !side; $("pSide").textContent = side;
+    $("pProg").textContent = `Exercise ${s.i + 1} of ${P.lesson.items.length}`;
+    $("pSteps").innerHTML =
+      `<dt>Set up</dt><dd>${esc(ex.setup)}</dd><dt>Move</dt><dd>${esc(ex.move)}</dd>` +
+      `<dt>Breathe</dt><dd>${esc(ex.breath)}</dd><dt>Focus</dt><dd>${esc(ex.focus)}</dd>` +
+      `<div class="easy"><dt>Easier option</dt><dd>${esc(ex.easier)}</dd></div>`;
+    renderTime();
+  }
+  function remainingTotal() {
+    let t = P.left / 1000;
+    for (let j = P.idx + 1; j < P.steps.length; j++) t += P.steps[j].secs;
+    return t;
+  }
+  function renderTime() {
+    const s = P.steps[P.idx];
+    const secs = Math.ceil(P.left / 1000);
+    $("pNum").textContent = secs;
+    $("pArc").setAttribute("stroke-dashoffset", (ARC * (1 - P.left / (s.secs * 1000))).toFixed(2));
+    $("pArc").setAttribute("stroke", s.kind === "work" ? "#7E9C80" : "#C99A73");
+    const total = P.steps.reduce((a, x) => a + x.secs, 0);
+    $("pBar").style.width = ((1 - remainingTotal() / total) * 100).toFixed(2) + "%";
+    $("pProg").textContent = `Exercise ${s.i + 1} of ${P.lesson.items.length} · ${fmt(remainingTotal())} left`;
+  }
+  function tick() {
+    if (!P.running) return;
+    P.left = Math.max(0, P.endAt - performance.now());
+    const sec = Math.ceil(P.left / 1000);
+    if (sec !== P.lastSec) {
+      if (sec >= 1 && sec <= 3 && P.lastSec != null) sound("tick");
+      P.lastSec = sec;
+    }
+    if (P.left <= 0) {
+      const s = P.steps[P.idx];
+      sound(s.kind === "work" ? "rest" : "go");
+      if (P.idx + 1 >= P.steps.length) return finish();
+      enterStep(P.idx + 1, true);
+      return;
+    }
+    renderTime();
+  }
+  function play() {
+    P.running = true; P.endAt = performance.now() + P.left;
+    clearInterval(P.timer); P.timer = setInterval(tick, 100);
+    $("pPlay").innerHTML = ICON_PAUSE; $("pPlay").setAttribute("aria-label", "Pause");
+    if (P.fig) P.fig.setPaused(false);
+  }
+  function pause() {
+    if (P.running) P.left = Math.max(0, P.endAt - performance.now());
+    P.running = false; clearInterval(P.timer);
+    $("pPlay").innerHTML = ICON_PLAY; $("pPlay").setAttribute("aria-label", "Play");
+    if (P.fig) P.fig.setPaused(true);
+    try { speechSynthesis.cancel(); } catch (e) {}
+    renderTime();
+  }
+  function stopPlayer() {
+    P.running = false; clearInterval(P.timer);
+    if (P.fig) { P.fig.stop(); P.fig = null; }
+    P.figKey = ""; releaseWake();
+    try { speechSynthesis.cancel(); } catch (e) {}
+  }
+  $("pPlay").onclick = () => { unlockAudio(); P.running ? pause() : play(); };
+  $("pNext").onclick = () => {
+    if (P.idx + 1 >= P.steps.length) { P.left = 0; return finish(); }
+    enterStep(P.idx + 1, true);
+  };
+  $("pPrev").onclick = () => {
+    const s = P.steps[P.idx];
+    const elapsed = s.secs * 1000 - P.left;
+    if (s.kind === "work" && elapsed > 3000) return enterStep(P.idx, false);
+    for (let j = P.idx - 1; j >= 0; j--) {
+      if (P.steps[j].kind === "work" || P.steps[j].kind === "ready") return enterStep(j, false);
+    }
+    enterStep(0, false);
+  };
+  $("pQuit").onclick = () => {
+    const was = P.running; pause();
+    if (confirm("End this lesson? It won't count as done.")) { stopPlayer(); show(overviewFrom === "library" ? "library" : "home"); }
+    else if (was) play();
+  };
+  function finish() {
+    const l = P.lesson;
+    stopPlayer();
+    state.history.push({ id: l.id, date: today(), ts: Date.now() });
+    save();
+    const ws = weekStart();
+    const n = state.history.filter(h => h.date >= ws).length;
+    $("finTitle").textContent = l.title;
+    $("finWeek").textContent = n === 1 ? "That's your first session this week." : `That's ${n} sessions this week.`;
+    say("Well done. Lesson complete.");
+    views.forEach(v => { $(v).hidden = v !== "finished"; });
+    $("player").hidden = true;
+    window.scrollTo(0, 0);
+  }
+  document.addEventListener("visibilitychange", () => {
+    if ($("player").hidden) return;
+    if (document.hidden) { if (P.running) pause(); }
+    else keepAwake();
+  });
+
+  // ---------- start ----------
+  show("home");
+  // a new day may start while the app sits open
+  let shownDay = today();
+  setInterval(() => { if (today() !== shownDay) { shownDay = today(); if (!$("home").hidden) renderHome(); } }, 60000);
+  if (location.protocol === "https:" && "serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>
