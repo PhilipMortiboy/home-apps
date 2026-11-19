@@ -37,7 +37,7 @@
   button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
   .wrap {
     max-width: 560px; margin: 0 auto;
-    padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 28px);
+    padding: calc(env(safe-area-inset-top) + 40px) 16px calc(env(safe-area-inset-bottom) + 28px);
   }
   [hidden] { display: none !important; }
   h1 { font-size: 28px; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
@@ -119,26 +119,44 @@
   .btnrow .btn { margin-top: 10px; }
 
   /* ---------- player ---------- */
-  #player { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; z-index: 5; }
-  .p-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(env(safe-area-inset-top) + 6px) 12px 0; max-width: 560px; width: 100%; margin: 0 auto; }
+  #player { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; position: fixed; inset: 0; background: var(--work-bg); display: flex; flex-direction: column; z-index: 5; --peek: 132px; --work-bg: #E9F0E5; --rest-bg: #F8E6D4; --rest: #B06F45; transition: background .4s; }
+  #player.is-rest { background: var(--rest-bg); }
+  .p-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(env(safe-area-inset-top) + 16px) 12px 0; max-width: 560px; width: 100%; margin: 0 auto; }
   .p-x { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 24px; color: var(--muted); }
   .p-prog { flex: 1; text-align: center; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .bar { height: 4px; background: var(--line); border-radius: 2px; margin: 6px 16px 0; max-width: 528px; align-self: center; width: calc(100% - 32px); overflow: hidden; }
   .bar i { display: block; height: 100%; width: 0; background: var(--sage); transition: width .3s linear; }
-  .p-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-  .p-inner { max-width: 560px; margin: 0 auto; padding: 4px 16px 20px; }
+  .p-stage { flex: 1; position: relative; overflow: hidden; }
+  .p-main { max-width: 560px; height: 100%; margin: 0 auto; padding: 6px 16px calc(var(--peek) + 10px); display: flex; flex-direction: column; justify-content: center; }
+  .sheet { position: absolute; left: 0; right: 0; top: 6px; bottom: 0; max-width: 560px; margin: 0 auto; display: flex; flex-direction: column;
+    background: var(--card); border: 1px solid var(--line); border-bottom: 0; border-radius: 22px 22px 0 0; box-shadow: 0 -6px 24px rgba(46,56,48,.12);
+    transform: translateY(calc(100% - var(--peek))); transition: transform .32s cubic-bezier(.2,.8,.2,1); }
+  .sheet.open { transform: translateY(0); }
+  .sheet.dragging { transition: none; }
+  .sheet:not(.open) { touch-action: none; }
+  .sheet-head { touch-action: none; padding: 8px 16px 6px; text-align: center; cursor: grab; flex: 0 0 auto; }
+  .grab { display: block; width: 40px; height: 5px; border-radius: 3px; background: #CFC4B1; margin: 0 auto 8px; }
+  .sheet-title { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .sheet-body { flex: 1; overflow: hidden; padding: 0 16px calc(env(safe-area-inset-bottom) + 20px); }
+  .sheet.open .sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  .sheet:not(.open) .sheet-body { -webkit-mask-image: linear-gradient(to bottom, #000 calc(var(--peek) - 80px), transparent calc(var(--peek) - 40px)); mask-image: linear-gradient(to bottom, #000 calc(var(--peek) - 80px), transparent calc(var(--peek) - 40px)); }
   .p-fig { background: #fff; border: 1px solid var(--line); border-radius: var(--r); padding: 4px 4px 0; position: relative; }
-  .p-fig svg { height: 210px; }
+  .p-fig svg { height: min(210px, 30vh); transition: opacity .4s; }
+  .p-fig .nextup { display: none; position: absolute; top: 10px; left: 12px; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #fff; background: var(--rest); border-radius: 999px; padding: 2px 10px; }
+  #player.is-rest .p-fig .nextup { display: block; }
+  #player.is-rest .p-fig svg { opacity: .55; }
   .p-fig .side { position: absolute; top: 10px; right: 12px; font-size: 13px; font-weight: 600; color: var(--sage-dk); background: var(--sage-lt); border-radius: 999px; padding: 2px 10px; }
   .p-now { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
   .ring { flex: 0 0 104px; width: 104px; height: 104px; position: relative; }
   .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
   .ring .num { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .phase { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--sage-dk); }
-  .phase.rest { color: var(--warn); }
+  .phase { display: inline-block; font-size: 14px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #fff; background: var(--sage-dk); border-radius: 999px; padding: 3px 12px; }
+  #player.is-rest .phase { background: var(--rest); }
+  #player.is-rest .ring .num { color: var(--rest); }
   .p-name { font-size: 23px; font-weight: 700; line-height: 1.2; margin-top: 2px; }
   .p-reps { color: var(--muted); margin-top: 3px; font-size: 15px; }
-  .steps { margin-top: 16px; }
+  .steps { margin: 0; }
+  .steps dt:first-child { margin-top: 4px; }
   .steps dt { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 12px; }
   .steps dd { margin: 2px 0 0; }
   .steps .easy { background: var(--sage-lt); border-radius: 12px; padding: 10px 12px; margin-top: 14px; }
@@ -241,9 +259,9 @@
     <div style="width:44px"></div>
   </div>
   <div class="bar"><i id="pBar"></i></div>
-  <div class="p-scroll" id="pScroll">
-    <div class="p-inner">
-      <div class="p-fig"><div class="fig" id="pFig"></div><span class="side" id="pSide" hidden></span></div>
+  <div class="p-stage">
+    <div class="p-main">
+      <div class="p-fig"><div class="fig" id="pFig"></div><span class="nextup">Next up</span><span class="side" id="pSide" hidden></span></div>
       <div class="p-now">
         <div class="ring">
           <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#E4DACA" stroke-width="8"/><circle id="pArc" cx="50" cy="50" r="44" fill="none" stroke="#7E9C80" stroke-width="8" stroke-linecap="round" stroke-dasharray="276.46" stroke-dashoffset="0"/></svg>
@@ -255,8 +273,13 @@
           <div class="p-reps" id="pReps"></div>
         </div>
       </div>
-      <dl class="steps" id="pSteps"></dl>
     </div>
+    <section class="sheet" id="pSheet" aria-label="How to do it">
+      <div class="sheet-head" id="pSheetHead" role="button" tabindex="0" aria-expanded="false">
+        <span class="grab"></span><span class="sheet-title">How to do it</span>
+      </div>
+      <div class="sheet-body" id="pSheetBody"><dl class="steps" id="pSteps"></dl></div>
+    </section>
   </div>
   <div class="p-ctrl">
     <button class="cbtn" id="pPrev" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9.5 12z"/></svg></button>
@@ -485,12 +508,19 @@
     try {
       if (kind === "tick") tone(880, 0, 0.12, 0.18);
       else if (kind === "rest") { tone(660, 0, 0.9, 0.22); tone(523, 0.18, 1.1, 0.2); }  // work finished
-      else { tone(784, 0, 0.7, 0.22); tone(1047, 0.14, 0.9, 0.2); }                       // go
+      else { tone(1319, 0, 1.6, 0.3); tone(2638, 0, 0.8, 0.08); tone(1976, 0, 1.2, 0.06); }  // ding: exercise starts
     } catch (e) {}
   }
   let enVoice = null;
   function pickVoice() {
-    try { const vs = speechSynthesis.getVoices(); enVoice = vs.find(v => v.lang === "en-GB") || vs.find(v => /^en/.test(v.lang)) || null; } catch (e) {}
+    try {
+      const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang));
+      const female = /serena|kate|stephanie|martha|fiona|moira|tessa|karen|samantha|victoria|susan|female/i;
+      const gb = v => /en[-_]GB/i.test(v.lang);
+      enVoice = vs.find(v => gb(v) && female.test(v.name) && /premium|enhanced/i.test(v.name)) ||
+        vs.find(v => gb(v) && female.test(v.name)) || vs.find(v => female.test(v.name)) ||
+        vs.find(gb) || vs[0] || null;
+    } catch (e) {}
   }
   if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
   function say(text) {
@@ -519,6 +549,7 @@
   function startLesson(l) {
     unlockAudio();
     P.lesson = l; P.steps = buildSteps(l); P.idx = 0; P.figKey = "";
+    window.__sheet(false);
     views.forEach(v => { $(v).hidden = true; });
     $("player").hidden = false;
     keepAwake();
@@ -532,6 +563,7 @@
     P.left = s.secs * 1000; P.lastSec = null;
     if (P.running) P.endAt = performance.now() + P.left;
     renderStep();
+    if (s.kind === "work" && P.running) sound("go");
     if (announce) {
       const ex = stepEx(s);
       if (s.kind === "ready" || s.kind === "rest") say(`Next: ${ex.name}${ex.sides ? ", first side" : ""}`);
@@ -546,16 +578,17 @@
       if (P.fig) P.fig.stop();
       P.fig = Figure.mount($("pFig"), ex, { mirror, paused: !P.running });
       P.figKey = key;
-      $("pScroll").scrollTop = 0;
+      $("pSheetBody").scrollTop = 0;
     }
-    const labels = { ready: "Get ready", rest: "Rest · next up", switch: "Switch sides", work: ex.type === "hold" ? "Hold" : "Reps" };
+    const labels = { ready: "Get ready", rest: "Rest", switch: "Switch sides", work: ex.type === "hold" ? "Hold" : "Reps" };
     $("pPhase").textContent = labels[s.kind];
-    $("pPhase").classList.toggle("rest", s.kind !== "work");
+    $("player").classList.toggle("is-rest", s.kind !== "work");
     $("pName").textContent = ex.name;
     const each = ex.sides ? " each side" : "";
     $("pReps").textContent = ex.type === "hold"
       ? (item.r || (ex.reps && !/rep/i.test(ex.reps) ? ex.reps : `Hold for ${item.s} seconds${each}`))
       : `${item.r || ex.reps} in ${item.s} seconds${each}`;
+    if (s.kind === "ready" || s.kind === "rest") $("pReps").textContent = "Next up · " + $("pReps").textContent;
     const side = s.kind === "work" && s.side ? `Side ${s.side} of 2` : s.kind === "switch" ? "Side 2 next" : (ex.sides ? "Both sides" : "");
     $("pSide").hidden = !side; $("pSide").textContent = side;
     $("pProg").textContent = `Exercise ${s.i + 1} of ${P.lesson.items.length}`;
@@ -585,12 +618,12 @@
     P.left = Math.max(0, P.endAt - performance.now());
     const sec = Math.ceil(P.left / 1000);
     if (sec !== P.lastSec) {
-      if (sec >= 1 && sec <= 3 && P.lastSec != null) sound("tick");
+      if (sec >= 1 && sec <= 5 && P.lastSec != null) sound("tick");
       P.lastSec = sec;
     }
     if (P.left <= 0) {
       const s = P.steps[P.idx];
-      sound(s.kind === "work" ? "rest" : "go");
+      if (s.kind === "work") sound("rest");
       if (P.idx + 1 >= P.steps.length) return finish();
       enterStep(P.idx + 1, true);
       return;
@@ -655,6 +688,42 @@
     if (document.hidden) { if (P.running) pause(); }
     else keepAwake();
   });
+
+  // ---------- instructions sheet: tap or drag the handle; drag anywhere while it's down ----------
+  (function sheet() {
+    const sh = $("pSheet"), head = $("pSheetHead");
+    let open = false, drag = null;
+    const closedY = () => sh.offsetHeight - parseFloat(getComputedStyle($("player")).getPropertyValue("--peek"));
+    function set(o) {
+      open = o; sh.classList.toggle("open", o); sh.style.transform = "";
+      head.setAttribute("aria-expanded", String(o));
+      if (!o) $("pSheetBody").scrollTop = 0;
+    }
+    window.__sheet = set;
+    sh.addEventListener("pointerdown", e => {
+      if (open && !head.contains(e.target)) return;   // open: the body scrolls; drag by the handle
+      drag = { y0: e.clientY, t0: performance.now(), dy: 0, moved: false, id: e.pointerId };
+    });
+    window.addEventListener("pointermove", e => {
+      if (!drag || e.pointerId !== drag.id) return;
+      drag.dy = e.clientY - drag.y0;
+      if (!drag.moved && Math.abs(drag.dy) < 6) return;
+      if (!drag.moved) { drag.moved = true; sh.classList.add("dragging"); try { sh.setPointerCapture(drag.id); } catch (_) {} }
+      const c = closedY(), y = Math.min(c, Math.max(0, (open ? 0 : c) + drag.dy));
+      sh.style.transform = `translateY(${y}px)`;
+    });
+    const end = e => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const d = drag; drag = null; sh.classList.remove("dragging");
+      if (!d.moved) { if (head.contains(e.target) || (!open && sh.contains(e.target))) set(!open); return; }
+      const c = closedY(), y = Math.min(c, Math.max(0, (open ? 0 : c) + d.dy));
+      const v = d.dy / Math.max(1, performance.now() - d.t0);   // px per ms
+      set(v < -0.4 ? true : v > 0.4 ? false : y < c / 2);
+    };
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    head.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); set(!open); } });
+  })();
 
   // ---------- start ----------
   show("home");
