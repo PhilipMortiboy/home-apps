@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light only">
-<meta name="theme-color" content="#F4EEE3">
+<meta name="theme-color" content="#F4EEE3" id="themeColor">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -139,7 +139,7 @@
   .sheet-title { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   .sheet-body { flex: 1; overflow: hidden; padding: 0 16px calc(env(safe-area-inset-bottom) + 20px); }
   .sheet.open .sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-  .sheet:not(.open) .sheet-body { -webkit-mask-image: linear-gradient(to bottom, #000 calc(var(--peek) - 80px), transparent calc(var(--peek) - 40px)); mask-image: linear-gradient(to bottom, #000 calc(var(--peek) - 80px), transparent calc(var(--peek) - 40px)); }
+  .sheet:not(.open) .sheet-body { -webkit-mask-image: linear-gradient(to bottom, #000 18px, rgba(0,0,0,.08) calc(var(--peek) - 52px)); mask-image: linear-gradient(to bottom, #000 18px, rgba(0,0,0,.08) calc(var(--peek) - 52px)); }
   .p-fig { background: #fff; border: 1px solid var(--line); border-radius: var(--r); padding: 4px 4px 0; position: relative; }
   .p-fig svg { height: min(210px, 30vh); transition: opacity .4s; }
   .p-fig .nextup { display: none; position: absolute; top: 10px; left: 12px; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #fff; background: var(--rest); border-radius: 999px; padding: 2px 10px; }
@@ -489,26 +489,34 @@
   let actx = null;
   function unlockAudio() {
     try {
-      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+      if (!actx) {
+        actx = new (window.AudioContext || window.webkitAudioContext)();
+        const comp = actx.createDynamicsCompressor();
+        comp.threshold.value = -12; comp.ratio.value = 4;
+        out = actx.createGain(); out.gain.value = 1.6;
+        out.connect(comp).connect(actx.destination);
+      }
       if (actx.state === "suspended") actx.resume();
     } catch (e) { actx = null; }
     try { if ("speechSynthesis" in window) { const u = new SpeechSynthesisUtterance(""); u.volume = 0; speechSynthesis.speak(u); } } catch (e) {}
   }
-  function tone(freq, start, dur, vol) {
+  let out = null;
+  function tone(freq, start, dur, vol, type = "sine") {
     const o = actx.createOscillator(), g = actx.createGain();
-    o.type = "sine"; o.frequency.value = freq;
+    o.type = type; o.frequency.value = freq;
     const t0 = actx.currentTime + start;
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(vol, t0 + 0.015);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+    o.connect(g).connect(out); o.start(t0); o.stop(t0 + dur + 0.05);
   }
   function sound(kind) {
     if (!state.sound || !actx) return;
     try {
-      if (kind === "tick") tone(880, 0, 0.12, 0.18);
-      else if (kind === "rest") { tone(660, 0, 0.9, 0.22); tone(523, 0.18, 1.1, 0.2); }  // work finished
-      else { tone(1319, 0, 1.6, 0.3); tone(2638, 0, 0.8, 0.08); tone(1976, 0, 1.2, 0.06); }  // ding: exercise starts
+      if (kind === "tick") tone(880, 0, 0.14, 0.5, "triangle");
+      else if (kind === "rest") { tone(660, 0, 0.9, 0.6); tone(523, 0.18, 1.1, 0.55); }  // work finished
+      else { tone(1319, 0, 1.6, 0.8); tone(2638, 0, 0.8, 0.18); tone(1976, 0, 1.2, 0.14); }  // ding: exercise starts
     } catch (e) {}
   }
   let enVoice = null;
@@ -583,6 +591,7 @@
     const labels = { ready: "Get ready", rest: "Rest", switch: "Switch sides", work: ex.type === "hold" ? "Hold" : "Reps" };
     $("pPhase").textContent = labels[s.kind];
     $("player").classList.toggle("is-rest", s.kind !== "work");
+    setTheme(s.kind === "work" ? "#E9F0E5" : "#F8E6D4");
     $("pName").textContent = ex.name;
     const each = ex.sides ? " each side" : "";
     $("pReps").textContent = ex.type === "hold"
@@ -644,7 +653,9 @@
     try { speechSynthesis.cancel(); } catch (e) {}
     renderTime();
   }
+  function setTheme(c) { try { $("themeColor").setAttribute("content", c); document.body.style.background = c; } catch (e) {} }
   function stopPlayer() {
+    setTheme("#F4EEE3");
     P.running = false; clearInterval(P.timer);
     if (P.fig) { P.fig.stop(); P.fig = null; }
     P.figKey = ""; releaseWake();
@@ -715,7 +726,8 @@
     const end = e => {
       if (!drag || e.pointerId !== drag.id) return;
       const d = drag; drag = null; sh.classList.remove("dragging");
-      if (!d.moved) { if (head.contains(e.target) || (!open && sh.contains(e.target))) set(!open); return; }
+      const on = el => e.target instanceof Node && el.contains(e.target);
+      if (!d.moved) { if (on(head) || (!open && on(sh))) set(!open); return; }
       const c = closedY(), y = Math.min(c, Math.max(0, (open ? 0 : c) + d.dy));
       const v = d.dy / Math.max(1, performance.now() - d.t0);   // px per ms
       set(v < -0.4 ? true : v > 0.4 ? false : y < c / 2);
