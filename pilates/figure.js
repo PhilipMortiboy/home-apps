@@ -104,6 +104,7 @@
       return ik(j.S, tgt, LEN.ua, LEN.fa, a.b ?? 1);
     };
     r.a = armOf(p.a); r.A = p.A ? armOf(p.A) : r.a.slice();
+    fix(r);
     if (!(fixedRoot && bodyAnchor)) {
       if (usesWorld) throw new Error("world targets need a body anchor");
       placeRoot();
@@ -111,11 +112,67 @@
     return r;
   }
 
+  // ---- what a body can do ----
+  // Pose angles are absolute directions in the side view, with the body's front at (trunk - 90).
+  // Each joint's angle is measured from its neutral standing position, wrapped so the cut
+  // falls in a range no body can reach. Limits are generous, for a flexible adult.
+  const wrap = (x, lo = -180) => ((((x - lo) % 360) + 360) % 360) + lo;
+  const LIM = {
+    spine: [-85, 50],     // upper trunk vs lower trunk: flexion (-) / extension (+)
+    neck: [-60, 70],      // head vs upper trunk
+    shoulder: [-80, 235], // upper arm: 0 hanging, 90 forward, 180 overhead, - behind
+    elbow: [0, 150],      // forearm vs upper arm: 0 straight, + bent
+    hip: [-35, 165],      // thigh: 0 standing, 90 forward, - behind
+    knee: [-160, 0],      // shin vs thigh: 0 straight, - bent
+    ankle: [10, 115],     // foot vs shin: 90 standing, small = pointed
+  };
+  const clamp = (x, [lo, hi]) => Math.min(hi, Math.max(lo, x));
+  const SH_CUT = -110; // shoulder angles wrap at the impossible "far behind" direction
+  function rel(r) {
+    const arm = (a, u) => [wrap(a[0] - u + 180, SH_CUT), wrap(a[1] - a[0])];
+    const leg = (l, t) => [wrap(l[0] - t + 180), wrap(l[1] - l[0]), wrap(l[2] - l[1])];
+    return { px: r.px, py: r.py, t: r.t, sp: wrap(r.u - r.t), nk: wrap(r.n - r.u),
+      a: arm(r.a, r.u), A: arm(r.A, r.u), l: leg(r.l, r.t), L: leg(r.L, r.t) };
+  }
+  function abs(j) {
+    const u = j.t + j.sp;
+    const arm = a => { const a0 = a[0] + u - 180; return [a0, a0 + a[1]]; };
+    const leg = l => { const l0 = l[0] + j.t - 180, l1 = l0 + l[1]; return [l0, l1, l1 + l[2]]; };
+    return { px: j.px, py: j.py, t: j.t, u, n: u + j.nk, a: arm(j.a), A: arm(j.A), l: leg(j.l), L: leg(j.L) };
+  }
+  // Bend a two-bone limb the way the joint actually bends, keeping its end where it was:
+  // reflect both bones across the line from the root to the end.
+  function flip(b0, b1, l0, l1) {
+    const e = add(dir(b0), dir(b1), l1 / l0), base = Math.atan2(e[1], e[0]) * 180 / Math.PI;
+    return [2 * base - b0, 2 * base - b1];
+  }
+  function fix(r) {
+    // too much spinal flexion is taken at the hip instead
+    let sp = wrap(r.u - r.t);
+    if (sp < LIM.spine[0] || sp > LIM.spine[1]) r.t = r.u - clamp(sp, LIM.spine);
+    r.n = r.u + clamp(wrap(r.n - r.u), LIM.neck);
+    for (const k of ["a", "A"]) {
+      let a = r[k];
+      if (wrap(a[1] - a[0]) < 0) a = flip(a[0], a[1], LEN.ua, LEN.fa);
+      const s = clamp(wrap(a[0] - r.u + 180, SH_CUT), LIM.shoulder), e = clamp(wrap(a[1] - a[0]), LIM.elbow);
+      const a0 = s + r.u - 180; r[k] = [a0, a0 + e];
+    }
+    for (const k of ["l", "L"]) {
+      let l = r[k], f = l[2];
+      if (wrap(l[1] - l[0]) > 0) [l[0], l[1]] = flip(l[0], l[1], LEN.th, LEN.sh);
+      const h = clamp(wrap(l[0] - r.t + 180), LIM.hip), kn = clamp(wrap(l[1] - l[0]), LIM.knee);
+      const l0 = h + r.t - 180, l1 = l0 + kn;
+      r[k] = [l0, l1, l1 + clamp(wrap(f - l1), LIM.ankle)];
+    }
+    return r;
+  }
+
+  // Blend two poses joint by joint, so each joint takes the short way round within its range.
   const lerp = (a, b, k) => a + (b - a) * k;
   function mix(r1, r2, k) {
-    const m = (x, y) => x.map((v, i) => lerp(v, y[i], k));
-    return { px: lerp(r1.px, r2.px, k), py: lerp(r1.py, r2.py, k), t: lerp(r1.t, r2.t, k), u: lerp(r1.u, r2.u, k),
-      n: lerp(r1.n, r2.n, k), a: m(r1.a, r2.a), A: m(r1.A, r2.A), l: m(r1.l, r2.l), L: m(r1.L, r2.L) };
+    const x = rel(r1), y = rel(r2), m = (p, q) => p.map((v, i) => lerp(v, q[i], k));
+    return abs({ px: lerp(x.px, y.px, k), py: lerp(x.py, y.py, k), t: lerp(x.t, y.t, k), sp: lerp(x.sp, y.sp, k),
+      nk: lerp(x.nk, y.nk, k), a: m(x.a, y.a), A: m(x.A, y.A), l: m(x.l, y.l), L: m(x.L, y.L) });
   }
 
   // ---- drawing ----
@@ -248,5 +305,5 @@
     };
   }
 
-  window.Figure = { mount, still, resolve, LEN };
+  window.Figure = { mount, still, resolve, mix, fix, rel, LIM, LEN };
 })();
