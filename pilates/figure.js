@@ -15,9 +15,9 @@
   const R = { P: 10, W: 10, S: 9, H: 11, K: 6, Ak: 4.5, T: 3, E: 4, Hd: 4 };
   // colours match the 3D model: white tee, dark green leggings, bare feet, dark ponytail
   const C = {
-    skin: "#DDAA84", skinFar: "#C69370", tee: "#F7F6F1", teeFar: "#E2E1DA",
-    legs: "#34403A", legsFar: "#252E29", hair: "#1A1414", eye: "#2A2220",
-    line: "#46564A", mat: "#9DC08F", matEdge: "#7FA572",
+    skin: "#E0AE88", skinFar: "#C9967A", tee: "#F7F6F1", teeFar: "#E2E0D8",
+    legs: "#34403A", legsFar: "#232B27", hair: "#1E1817", eye: "#2A2220", ear: "#D49E7C",
+    line: "#5E6B62", mat: "#9DC08F", matEdge: "#7FA572",
   };
   const rad = d => d * Math.PI / 180;
   const dir = d => [Math.cos(rad(d)), Math.sin(rad(d))];
@@ -177,64 +177,85 @@
   }
 
   // ---- drawing ----
+  // Soft flat style: each body part is a smooth tapered shape in flat colour.
+  // Only the T-shirt has an outline, so it stands out from the pale card.
   const f1 = v => v.toFixed(1);
   const X = p => f1(p[0]), Y = p => f1(-p[1]);
-  const line = (p, q, w, c) => `<line x1="${X(p)}" y1="${Y(p)}" x2="${X(q)}" y2="${Y(q)}" stroke="${c}" stroke-width="${w}"/>`;
-  const poly = (pts, w, c) => `<polyline points="${pts.map(p => X(p) + "," + Y(p)).join(" ")}" fill="none" stroke="${c}" stroke-width="${w}"/>`;
-  const circ = (p, r, c) => `<circle cx="${X(p)}" cy="${Y(p)}" r="${r}" fill="${c}"/>`;
-  const OUT = 2.6;
 
-  // each part: [kind, geometry, width, colour]; drawn as outline pass then fill pass
-  function layer(parts) {
-    let o = "", f = "";
-    for (const [k, g, w, c] of parts) {
-      if (k === "l") { o += line(g[0], g[1], w + OUT, C.line); f += line(g[0], g[1], w, c); }
-      else if (k === "p") { o += poly(g, w + OUT, C.line); f += poly(g, w, c); }
-      else if (k === "c") { o += circ(g[0], g[1] + OUT / 2, C.line); f += circ(g[0], g[1], c); }
-      else if (k === "raw") { f += g; }
+  // closed Catmull-Rom curve through the points
+  function smooth(ring) {
+    const n = ring.length;
+    let d = `M${X(ring[0])} ${Y(ring[0])}`;
+    for (let i = 0; i < n; i++) {
+      const p0 = ring[(i - 1 + n) % n], p1 = ring[i], p2 = ring[(i + 1) % n], p3 = ring[(i + 2) % n];
+      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+      const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+      d += ` C${X(c1)} ${Y(c1)} ${X(c2)} ${Y(c2)} ${X(p2)} ${Y(p2)}`;
     }
-    return o + f;
+    return d + "Z";
   }
-  function armParts(S, s, far) {
-    const sleeve = lerpP(S, s.E, 0.42);
-    return [["l", [s.E, s.Hd], 7, far ? C.skinFar : C.skin], ["l", [sleeve, s.E], 7.6, far ? C.skinFar : C.skin],
-      ["l", [S, sleeve], 9.5, far ? C.teeFar : C.tee]];
+  // A tapered shape along `pts`, with half-widths `wl` on the left of travel and `wr` on the right.
+  function ribbon(pts, wl, wr = wl) {
+    const n = pts.length, L = [], Rt = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+      const t = Math.atan2(b[1] - a[1], b[0] - a[0]), nl = [-Math.sin(t), Math.cos(t)];
+      L.push(add(pts[i], nl, wl[i])); Rt.push(add(pts[i], nl, -wr[i]));
+    }
+    const cap = (c, t, r) => [55, 0, -55].map(a => add(c, [Math.cos(t + rad(a)), Math.sin(t + rad(a))], r * (a ? 0.95 : 0.9)));
+    const te = Math.atan2(pts[n - 1][1] - pts[n - 2][1], pts[n - 1][0] - pts[n - 2][0]);
+    const ts = Math.atan2(pts[1][1] - pts[0][1], pts[1][0] - pts[0][0]) + Math.PI;
+    return smooth([...L, ...cap(pts[n - 1], te, (wl[n - 1] + wr[n - 1]) / 2), ...Rt.reverse(), ...cap(pts[0], ts, (wl[0] + wr[0]) / 2)]);
   }
-  function legParts(P, s, far) {
-    const legs = far ? C.legsFar : C.legs;
-    return [["l", [s.Ak, s.T], 6, far ? C.skinFar : C.skin], ["l", [s.K, s.Ak], 9.5, legs],
-      ["l", [P, s.K], 13, legs]];
+  const shape = (d, c, outline) => `<path d="${d}" fill="${c}"${outline ? ` stroke="${C.line}" stroke-width="1.3"` : ""}/>`;
+  const circ = (p, r, c) => `<circle cx="${X(p)}" cy="${Y(p)}" r="${r}" fill="${c}"/>`;
+
+  function arm(S, s, far) {
+    const E = s.E, Hd = s.Hd, back = add(S, dir(ang(S, E)), -2);
+    return shape(ribbon([S, lerpP(S, E, 0.5), E, lerpP(E, Hd, 0.45), lerpP(E, Hd, 0.8), Hd], [5.2, 4.4, 3.4, 3.3, 2.4, 2.9]), far ? C.skinFar : C.skin) +
+      shape(ribbon([back, S, lerpP(S, E, 0.45)], [5.6, 5.9, 5.3]), far ? C.teeFar : C.tee, true);
   }
-  function hair(H, n) {
-    const pts = [];
-    for (let a = n - 40; a <= n + 175; a += 12) pts.push(add(H, dir(a), 12.2));
-    pts.push(add(H, dir(n + 90), 2));
-    const cap = `<polygon points="${pts.map(p => X(p) + "," + Y(p)).join(" ")}" fill="${C.hair}"/>`;
+  function leg(P, s, far) {
+    const K = s.K, Ak = s.Ak, T = s.T;
+    return shape(ribbon([lerpP(Ak, T, -0.1), Ak, lerpP(Ak, T, 0.55), T], [2.4, 2.8, 2.9, 1.6]), far ? C.skinFar : C.skin) +
+      shape(ribbon([add(P, dir(ang(P, K)), -3), P, lerpP(P, K, 0.45), K, lerpP(K, Ak, 0.3), lerpP(K, Ak, 0.75), Ak],
+        [7.6, 7.8, 6.6, 4.4, 4.9, 3.4, 2.7]), far ? C.legsFar : C.legs);
+  }
+  function head(S, N, H, n) {
+    let s = shape(ribbon([lerpP(S, N, 0.1), N, lerpP(N, H, 0.3)], [3.4, 3.1, 3.6]), C.skin);
     // ponytail hangs back from the crown; it never dips below the mat
-    const flo = p => [p[0], Math.max(p[1], 3)];
-    const a0 = add(H, dir(n + 55), 11), c1 = flo(add(add(H, dir(n + 80), 17), [0, -3]));
+    const flo = p => [p[0], Math.max(p[1], 2)];
+    const a0 = add(H, dir(n + 55), 10), c1 = flo(add(add(H, dir(n + 80), 17), [0, -3]));
     const e = flo(add(add(H, dir(n + 100), 16), [0, -20]));
-    const tail = `<path d="M${X(a0)} ${Y(a0)} Q${X(c1)} ${Y(c1)} ${X(e)} ${Y(e)}" fill="none" stroke="${C.hair}" stroke-width="7"/>`;
-    const tie = circ(a0, 3.4, C.hair);
-    const eye = circ(add(H, dir(n - 62), 6.4), 1.4, C.eye);
-    return cap + tail + tie + eye;
+    const q = t => [(1 - t) ** 2 * a0[0] + 2 * (1 - t) * t * c1[0] + t * t * e[0], (1 - t) ** 2 * a0[1] + 2 * (1 - t) * t * c1[1] + t * t * e[1]];
+    s += shape(ribbon([0, .25, .5, .75, 1].map(q), [2.6, 3.6, 3.4, 2.4, 0.6]), C.hair);
+    // head, with a chin towards the front (n - 90)
+    const ring = [];
+    for (let a = 0; a < 360; a += 30) ring.push(add(H, dir(n + a), Math.cos(rad(a + 90)) > 0.5 ? 10.2 : 10.6));
+    ring.splice(8, 0, add(H, dir(n - 135), 10.5));
+    s += shape(smooth(ring), C.skin);
+    // hair over the crown and back of the head
+    const cap = [];
+    for (let a = -45; a <= 185; a += 20) cap.push(add(H, dir(n + a), 11.6));
+    cap.push(add(H, dir(n + 150), 6), add(H, dir(n + 70), 5), add(H, dir(n - 20), 7.5));
+    s += shape(smooth(cap), C.hair);
+    return s + circ(add(H, dir(n - 62), 6.2), 1.25, C.eye) + circ(add(H, dir(n + 110), 1.5), 2.1, C.ear);
+  }
+  function torso(P, W, S) {
+    const t = ang(P, W), u = ang(W, S);
+    const base = add(P, dir(t), -6);
+    // the front of the body is to the right of travel from pelvis to shoulders
+    const front = [7.6, 8.6, 7.4, 10.2, 7.6, 4.5], back = [9, 10.4, 7.4, 8.2, 8.4, 5.4];
+    return shape(ribbon([base, P, W, lerpP(W, S, 0.55), S, add(S, dir(u), 3)], back, front), C.tee, true) +
+      shape(ribbon([base, P, lerpP(P, W, 0.35)], [9, 10.4, 8.4], [7.6, 8.6, 7.6]), C.legs);
   }
 
   function draw(r) {
     const j = chain(r);
     const lift = lowest(j);
     if (lift < -0.01) return draw({ ...r, py: r.py - lift });
-    const P = j.P, W = j.W, S = j.S;
-    const waist = lerpP(P, W, 0.3);
-    let s = "";
-    s += layer(armParts(S, j.A, true));
-    s += layer(legParts(P, j.L, true));
-    s += layer([["l", [S, j.N], 7.5, C.skin], ["c", [j.H, LEN.head], 0, C.skin]]);
-    s += hair(j.H, j.n);
-    s += layer([["p", [P, W, S], 20, C.tee], ["l", [P, waist], 20.5, C.legs]]);
-    s += layer(legParts(P, j.l, false));
-    s += layer(armParts(S, j.a, false));
-    return s;
+    return arm(j.S, j.A, true) + leg(j.P, j.L, true) + head(j.S, j.N, j.H, j.n) +
+      torso(j.P, j.W, j.S) + leg(j.P, j.l, false) + arm(j.S, j.a, false);
   }
 
   function bounds(keys) {
