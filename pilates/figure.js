@@ -13,10 +13,11 @@
 (function () {
   const LEN = { lt: 22, ut: 28, neck: 6, head: 11, ua: 27, fa: 25, th: 42, sh: 40, ft: 11 };
   const R = { P: 10, W: 10, S: 9, H: 11, K: 6, Ak: 4.5, T: 3, E: 4, Hd: 4 };
+  // colours match the 3D model: white tee, dark green leggings, bare feet, dark ponytail
   const C = {
-    skin: "#E8BE98", skinFar: "#D3A47E", tee: "#FFFFFF", teeFar: "#E9EAE4",
-    shorts: "#2D3631", shortsFar: "#1E2521", sock: "#FAFAF7", sockFar: "#E2E3DD",
-    hair: "#1C1818", line: "#46564A", mat: "#9DC08F", matEdge: "#7FA572",
+    skin: "#DDAA84", skinFar: "#C69370", tee: "#F7F6F1", teeFar: "#E2E1DA",
+    legs: "#34403A", legsFar: "#252E29", hair: "#1A1414", eye: "#2A2220",
+    line: "#46564A", mat: "#9DC08F", matEdge: "#7FA572",
   };
   const rad = d => d * Math.PI / 180;
   const dir = d => [Math.cos(rad(d)), Math.sin(rad(d))];
@@ -200,10 +201,9 @@
       ["l", [S, sleeve], 9.5, far ? C.teeFar : C.tee]];
   }
   function legParts(P, s, far) {
-    const shortEnd = lerpP(P, s.K, 0.38), sockTop = lerpP(s.K, s.Ak, 0.84);
-    return [["l", [s.Ak, s.T], 6.5, far ? C.sockFar : C.sock], ["l", [s.K, sockTop], 9.5, far ? C.skinFar : C.skin],
-      ["l", [sockTop, s.Ak], 8.6, far ? C.sockFar : C.sock], ["l", [shortEnd, s.K], 12, far ? C.skinFar : C.skin],
-      ["l", [P, shortEnd], 13.5, far ? C.shortsFar : C.shorts]];
+    const legs = far ? C.legsFar : C.legs;
+    return [["l", [s.Ak, s.T], 6, far ? C.skinFar : C.skin], ["l", [s.K, s.Ak], 9.5, legs],
+      ["l", [P, s.K], 13, legs]];
   }
   function hair(H, n) {
     const pts = [];
@@ -213,10 +213,11 @@
     // ponytail hangs back from the crown; it never dips below the mat
     const flo = p => [p[0], Math.max(p[1], 3)];
     const a0 = add(H, dir(n + 55), 11), c1 = flo(add(add(H, dir(n + 80), 17), [0, -3]));
-    const e = flo(add(add(H, dir(n + 100), 15), [0, -16]));
-    const tail = `<path d="M${X(a0)} ${Y(a0)} Q${X(c1)} ${Y(c1)} ${X(e)} ${Y(e)}" fill="none" stroke="${C.hair}" stroke-width="6.5"/>`;
-    const tie = circ(a0, 3, C.hair);
-    return cap + tail + tie;
+    const e = flo(add(add(H, dir(n + 100), 16), [0, -20]));
+    const tail = `<path d="M${X(a0)} ${Y(a0)} Q${X(c1)} ${Y(c1)} ${X(e)} ${Y(e)}" fill="none" stroke="${C.hair}" stroke-width="7"/>`;
+    const tie = circ(a0, 3.4, C.hair);
+    const eye = circ(add(H, dir(n - 62), 6.4), 1.4, C.eye);
+    return cap + tail + tie + eye;
   }
 
   function draw(r) {
@@ -224,13 +225,13 @@
     const lift = lowest(j);
     if (lift < -0.01) return draw({ ...r, py: r.py - lift });
     const P = j.P, W = j.W, S = j.S;
-    const shortsTop = lerpP(P, W, 0.42);
+    const waist = lerpP(P, W, 0.3);
     let s = "";
     s += layer(armParts(S, j.A, true));
     s += layer(legParts(P, j.L, true));
     s += layer([["l", [S, j.N], 7.5, C.skin], ["c", [j.H, LEN.head], 0, C.skin]]);
     s += hair(j.H, j.n);
-    s += layer([["p", [P, W, S], 20, C.tee], ["l", [P, shortsTop], 20.5, C.shorts]]);
+    s += layer([["p", [P, W, S], 20, C.tee], ["l", [P, waist], 20.5, C.legs]]);
     s += layer(legParts(P, j.l, false));
     s += layer(armParts(S, j.a, false));
     return s;
