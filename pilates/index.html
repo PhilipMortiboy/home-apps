@@ -488,7 +488,17 @@
   $("ovBegin").onclick = () => startLesson(current);
 
   // ---------- sound and voice ----------
-  let actx = null;
+  // iOS can stop the audio context at any time: screen lock, switching apps, a notification,
+  // a call or Siri. It then reports "interrupted" (Safari only) or "suspended", and only a
+  // resume() - most reliably from a tap - starts it again. So: resume on every tap, on return
+  // to the app and whenever the state drops, and never schedule tones on a stopped clock.
+  let actx = null, out = null;
+  function wakeAudio() {
+    if (actx && actx.state !== "running" && actx.state !== "closed") {
+      try { return actx.resume().catch(() => {}); } catch (e) {}
+    }
+    return Promise.resolve();
+  }
   function unlockAudio() {
     try {
       try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
@@ -498,28 +508,41 @@
         comp.threshold.value = -12; comp.ratio.value = 4;
         out = actx.createGain(); out.gain.value = 1.6;
         out.connect(comp).connect(actx.destination);
+        actx.onstatechange = () => { if (!$("player").hidden && !document.hidden) wakeAudio(); };
       }
-      if (actx.state === "suspended") actx.resume();
+      wakeAudio();
+      // a silent blip inside the tap is what fully unlocks output on iOS
+      const b = actx.createBufferSource(); b.buffer = actx.createBuffer(1, 1, 22050);
+      b.connect(actx.destination); b.start(0);
     } catch (e) { actx = null; }
     try { if ("speechSynthesis" in window) { const u = new SpeechSynthesisUtterance(""); u.volume = 0; speechSynthesis.speak(u); } } catch (e) {}
   }
-  let out = null;
+  // any tap during a lesson is a fresh chance to restart stopped audio
+  document.addEventListener("pointerdown", () => { if (actx && !$("player").hidden) unlockAudio(); }, true);
   function tone(freq, start, dur, vol, type = "sine") {
     const o = actx.createOscillator(), g = actx.createGain();
     o.type = type; o.frequency.value = freq;
-    const t0 = actx.currentTime + start;
+    const t0 = actx.currentTime + 0.03 + start;   // a little lead so the start isn't already past
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(vol, t0 + 0.015);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     o.connect(g).connect(out); o.start(t0); o.stop(t0 + dur + 0.05);
   }
+  function playSound(kind) {
+    if (kind === "tick") tone(880, 0, 0.14, 0.5, "triangle");
+    else if (kind === "start") { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.16, 1.4, 0.55)); }  // lesson begins: rising chord
+    else if (kind === "rest") { tone(660, 0, 0.9, 0.6); tone(523, 0.18, 1.1, 0.55); }  // work finished
+    else { tone(1319, 0, 1.6, 0.8); tone(2638, 0, 0.8, 0.18); tone(1976, 0, 1.2, 0.14); }  // ding: exercise starts
+  }
+  let lastSoundAt = -1e9;
   function sound(kind) {
     if (!state.sound || !actx) return;
+    lastSoundAt = performance.now();
     try {
-      if (kind === "tick") tone(880, 0, 0.14, 0.5, "triangle");
-      else if (kind === "start") { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.16, 1.4, 0.55)); }  // lesson begins: rising chord
-      else if (kind === "rest") { tone(660, 0, 0.9, 0.6); tone(523, 0.18, 1.1, 0.55); }  // work finished
-      else { tone(1319, 0, 1.6, 0.8); tone(2638, 0, 0.8, 0.18); tone(1976, 0, 1.2, 0.14); }  // ding: exercise starts
+      if (actx.state === "running") return playSound(kind);
+      // stopped: try to restart it, and play only if that works at once (a late beep is wrong)
+      const asked = performance.now();
+      wakeAudio().then(() => { try { if (actx.state === "running" && performance.now() - asked < 400) playSound(kind); } catch (e) {} });
     } catch (e) {}
   }
   let enVoice = null;
@@ -534,14 +557,22 @@
     } catch (e) {}
   }
   if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+  // Speech on top of a chime: iOS ducks the chime under the voice and can stop the audio
+  // context, so speech waits until just after a chime that has just played.
+  let sayTimer = 0;
+  function hush() { clearTimeout(sayTimer); try { speechSynthesis.cancel(); } catch (e) {} }
   function say(text) {
     if (!state.voice || !("speechSynthesis" in window)) return;
-    try {
-      speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = "en-GB"; if (enVoice) u.voice = enVoice; u.rate = 0.95;
-      speechSynthesis.speak(u);
-    } catch (e) {}
+    hush();
+    const speak = () => {
+      try {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "en-GB"; if (enVoice) u.voice = enVoice; u.rate = 0.95;
+        speechSynthesis.speak(u);
+      } catch (e) {}
+    };
+    const wait = 900 - (performance.now() - lastSoundAt);
+    if (wait > 0) sayTimer = setTimeout(speak, wait); else speak();
   }
 
   // ---------- wake lock ----------
@@ -654,7 +685,7 @@
     P.running = false; clearInterval(P.timer);
     $("pPlay").innerHTML = ICON_PLAY; $("pPlay").setAttribute("aria-label", "Play");
     if (P.fig) P.fig.setPaused(true);
-    try { speechSynthesis.cancel(); } catch (e) {}
+    hush();
     renderTime();
   }
   function setTheme(c) { try { $("themeColor").setAttribute("content", c); document.body.style.background = c; } catch (e) {} }
@@ -663,7 +694,7 @@
     P.running = false; clearInterval(P.timer);
     if (P.fig) { P.fig.stop(); P.fig = null; }
     P.figKey = ""; releaseWake();
-    try { speechSynthesis.cancel(); } catch (e) {}
+    hush();
   }
   $("pPlay").onclick = () => { unlockAudio(); P.running ? pause() : play(); };
   $("pNext").onclick = () => {
@@ -701,7 +732,7 @@
   document.addEventListener("visibilitychange", () => {
     if ($("player").hidden) return;
     if (document.hidden) { if (P.running) pause(); }
-    else keepAwake();
+    else { keepAwake(); wakeAudio(); }
   });
 
   // ---------- instructions sheet: tap or drag the handle; drag anywhere while it's down ----------
