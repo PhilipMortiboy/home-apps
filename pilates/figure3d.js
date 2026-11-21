@@ -240,6 +240,14 @@
     }
     function apply(r, tw) {
       for (const I of order) setWorld(I, DRIVE[I.b.name](r));
+      // a foot planted on the mat lies with its sole flat: the ankle-to-toe bone slopes down in a flat foot,
+      // so a level pose angle would tip the toes up (lifted heels, tiptoes and pointed feet are left alone)
+      const flat = {};
+      for (const [n, f, up] of [["foot_r", r.l[2], tw.up.footR], ["foot_l", r.L[2], tw.up.footL]]) {
+        const fa = w180(f), k = c01((9 - up) / 3) * c01((45 - Math.abs(fa)) / 15), I = info[n];
+        flat[n] = { k, fa: fa + k * (deg(I.th0) - fa) };
+        if (k > 0) setWorld(I, flat[n].fa);
+      }
       // weight-bearing hands lie flat, fingers forward, palm turned to the mat
       // (a hand stays flat until it is well clear of the mat, so its fingers never dip into it)
       for (const [hn, fore, k0] of [["hand_r", r.a[1], c01((8 - tw.up.handR) / 5)], ["hand_l", r.A[1], c01((8 - tw.up.handL) / 5)]]) {
@@ -261,8 +269,8 @@
         th.b.parent.getWorldQuaternion(q2).invert(); th.b.quaternion.copy(q2.multiply(q1)); th.b.updateMatrixWorld(true);
       }
       // weight-bearing toes on a steep foot bend up to lie flat on the mat
-      for (const [n, f, k0] of [["ball_r", r.l[2], tw.footR], ["ball_l", r.L[2], tw.footL]]) {
-        const T = toe[n], fa = w180(f), k = k0 * c01(-Math.sin(rad(fa)) * 2 - 0.8);
+      for (const [n, F, k0] of [["ball_r", flat.foot_r, tw.footR], ["ball_l", flat.foot_l, tw.footL]]) {
+        const T = toe[n], fa = F.fa, k = k0 * (1 - F.k) * c01(-Math.sin(rad(fa)) * 2 - 0.8);
         if (k <= 0) { T.b.quaternion.copy(T.local); T.b.updateMatrixWorld(true); continue; }
         const nat = fa + T.off; // where the toes point with the foot as it is
         setWorld(T, nat + k * Math.min(90, Math.max(0, -nat)));
