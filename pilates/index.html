@@ -361,6 +361,7 @@
 </div>
 
 <script src="figure.js"></script>
+<script src="illustrations.js"></script>
 <script src="asset-versions.js"></script>
 <script src="figure3d.js"></script>
 <script src="exercises.js"></script>
@@ -425,7 +426,8 @@
       used.add(pick); featured[l.id] = pick;
     }); }
   const sigEx = l => byId[featured[l.id]];
-  const thumb = ex => `<div class="thumb" aria-hidden="true">${Figure.still(ex)}</div>`;
+  const card = ex => (window.Illustrations && Illustrations.svg(ex.id)) || Figure.still(ex);
+  const thumb = ex => `<div class="thumb" aria-hidden="true">${card(ex)}</div>`;
   const mins = s => `${Math.round(s / 60)} min`;
   const fmt = s => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 
@@ -469,7 +471,7 @@
       el.innerHTML = `
         <div class="card today">
           <span class="chip">Today · ${esc(catName(l.cat))}</span>
-          <div class="fig" aria-hidden="true">${Figure.still(sigEx(l)).replace("<svg ", '<svg preserveAspectRatio="xMidYMax meet" ')}</div>
+          <div class="fig" aria-hidden="true">${card(sigEx(l)).replace("<svg ", '<svg preserveAspectRatio="xMidYMax meet" ')}</div>
           <h2>${esc(l.title)}</h2>
           <p class="blurb">${esc(l.blurb)}</p>
           <div class="meta"><span>15 min</span><span>${l.items.length} exercises</span></div>
@@ -743,7 +745,7 @@
     clearTimeout(loadRun.slow); loadRun.ctrl.abort(); loadRun = null;
   }
   function openLoader(l) {
-    $("lFig").innerHTML = Figure.still(byId[l.items[0].e]);
+    $("lFig").innerHTML = card(byId[l.items[0].e]);
     $("loader").hidden = false;
     runLoad(l);
   }

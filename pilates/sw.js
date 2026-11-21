@@ -3,7 +3,7 @@
 // The large 3D files are saved per version (file?v=fingerprint): the app reads the
 // saved copy directly and only asks the network for a version it doesn't have.
 const CACHE = "tresza-training-v1"; // per app; keep it stable once installed
-const FILES = ["./", "index.html", "manifest.webmanifest", "icon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "figure.js", "exercises.js", "achievements.js",
+const FILES = ["./", "index.html", "manifest.webmanifest", "icon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "figure.js", "illustrations.js", "exercises.js", "achievements.js",
   "figure3d.js", "vendor/three.min.js", "vendor/GLTFLoader.js", "model/tresza_mh.json", "model/hair.png", "model/eye.png", "model/brows.png", "model/lashes.png", "asset-versions.js"];
 try { importScripts("asset-versions.js"); } catch (e) {}
 const VERSIONS = self.ASSET_VERSIONS || {};
