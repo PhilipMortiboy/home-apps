@@ -99,9 +99,6 @@
     const CHILD = { pelvis: "spine_01", spine_01: "spine_02", spine_02: "spine_03", spine_03: "neck_01", neck_01: "Head",
       upperarm_r: "lowerarm_r", lowerarm_r: "hand_r", upperarm_l: "lowerarm_l", lowerarm_l: "hand_l",
       thigh_r: "calf_r", calf_r: "foot_r", foot_r: "ball_r", thigh_l: "calf_l", calf_l: "foot_l", foot_l: "ball_l" };
-    const CONTACT = [["Head", 0.11], ["neck_01", 0.07], ["spine_03", 0.12], ["spine_02", 0.11], ["pelvis", 0.13], ["thigh_r", 0.09], ["thigh_l", 0.09],
-      ["calf_r", 0.06], ["calf_l", 0.06], ["foot_r", 0.05], ["foot_l", 0.05], ["ball_r", 0.03], ["ball_l", 0.03],
-      ["lowerarm_r", 0.045], ["lowerarm_l", 0.045], ["hand_r", 0.035], ["hand_l", 0.035]];
     const SC = 94; // model metres -> pose units
     const q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion(), qz = new THREE.Quaternion(), Z = new THREE.Vector3(0, 0, 1);
     const va = new THREE.Vector3(), vb = new THREE.Vector3();
@@ -121,7 +118,7 @@
       const d0 = CHILD[name] ? bones[CHILD[name]].getWorldPosition(new THREE.Vector3()).sub(p0).normalize() : new THREE.Vector3(0, 1, 0);
       info[name] = { b, rest, d0 };
     }
-    info.hand_r.d0 = info.lowerarm_r.d0.clone(); info.hand_l.d0 = info.lowerarm_l.d0.clone();
+    for (const h of ["hand_r", "hand_l"]) info[h].d0 = new THREE.Vector3(0, 1, 0).applyQuaternion(info[h].rest); // wrist to knuckles
     for (const k in info) { // each bone's rest direction swung into the side-view plane
       const d0 = info[k].d0, flat = new THREE.Vector3(d0.x, d0.y, 0);
       const nd = flat.length() > 0.35 ? flat.normalize() : new THREE.Vector3(0, -1, 0);
@@ -136,50 +133,223 @@
       const Hc = add(add(S, dir(r.n), NECK), dir(r.n), HR);
       const arm = a => { const E = add(S, dir(a[0]), LEN.ua); return { E, Hd: add(E, dir(a[1]), LEN.fa) }; };
       const leg = l => { const K = add(P, dir(l[0]), LEN.th), Ak = add(K, dir(l[1]), LEN.sh); return { K, Ak, T: add(Ak, dir(l[2]), LEN.ft) }; };
-      return { P, S, Hc, a: arm(r.a), A: arm(r.A), l: leg(r.l), L: leg(r.L) };
+      return { P, W, S, Hc, a: arm(r.a), A: arm(r.A), l: leg(r.l), L: leg(r.L) };
     }
     function lowest(j) {
       let m = Infinity; const c = (p, rr) => { m = Math.min(m, p[1] - rr); };
-      c(j.P, 10); c(j.S, 9); c(j.Hc, HR);
+      c(j.P, 10); c(j.W, 10); c(j.S, 9); c(j.Hc, HR);
       for (const s of [j.a, j.A]) { c(s.E, 4); c(s.Hd, 4); }
       for (const s of [j.l, j.L]) { c(s.K, 6); c(s.Ak, 4.5); c(s.T, 3.4); }
       return m;
     }
 
-    function pose(r, breath) {
-      for (const I of order) {
-        qz.setFromAxisAngle(Z, rad(DRIVE[I.b.name](r)) - I.th0);
-        q1.copy(qz).multiply(I.qn).multiply(I.rest);
-        I.b.parent.getWorldQuaternion(q2).invert();
-        I.b.quaternion.copy(q2.multiply(q1));
-        I.b.updateMatrixWorld(true);
+    // ---- contact with the mat ----
+    // The 3D body's proportions differ from the 2D figure's, so posing by the same angles leaves some
+    // parts short of the mat. The 2D pose says which parts touch; the 3D pose is adjusted until they do.
+    const c01 = x => Math.min(1, Math.max(0, x)), w180 = x => ((x % 360) + 540) % 360 - 180, deg = x => x * 180 / Math.PI;
+    // how firmly each part touches in the 2D pose: 1 on the mat, 0 from 3 units up
+    // (tw.up holds each part's height above the mat in the 2D pose)
+    function touch(r) {
+      const j = joints(r), lo = Math.min(0, lowest(j)), h = (p, rr) => p[1] - rr - lo;
+      const up = { handR: h(j.a.Hd, 4), handL: h(j.A.Hd, 4), footR: Math.min(h(j.l.T, 3.4), h(j.l.Ak, 4.5)), footL: Math.min(h(j.L.T, 3.4), h(j.L.Ak, 4.5)),
+        kneeR: h(j.l.K, 6), kneeL: h(j.L.K, 6), hips: Math.min(h(j.P, 10), h(j.W, 10)), trunk: h(j.S, 9), head: h(j.Hc, HR), arm: 99, leg: 99 };
+      const tw = { up };
+      for (const p in up) tw[p] = c01((3 - up[p]) / 2);
+      return tw;
+    }
+    // a sample of skin vertices, each tagged with the body part of its strongest bone
+    const PARTS = ["handR", "handL", "footR", "footL", "kneeR", "kneeL", "hips", "trunk", "head", "arm", "leg"];
+    const partOf = n => {
+      const s = /_r$/.test(n) ? "R" : /_l$/.test(n) ? "L" : "";
+      if (/^(hand|index|middle|pinky|ring|thumb)_/.test(n)) return "hand" + s;
+      if (/^(foot|ball)_/.test(n)) return "foot" + s;
+      if (/^(thigh|calf)_/.test(n)) return "knee" + s;
+      if (/^(Head|neck_01)$/.test(n)) return "head";
+      if (/^(spine_02|spine_03|clavicle_[lr])$/.test(n)) return "trunk";
+      if (/^(upperarm|lowerarm)_/.test(n)) return "arm";
+      return "hips";
+    };
+    // (only skin within 10 units of the knee joint counts as the knee; the rest of the leg is "leg")
+    const kneeAt = { R: bones.calf_r.getWorldPosition(new THREE.Vector3()), L: bones.calf_l.getWorldPosition(new THREE.Vector3()) };
+    const samples = skins.map(B => {
+      const g = B.geometry.attributes, idx = g.skinIndex.array, wt = g.skinWeight.array;
+      const part = B.skeleton.bones.map(b => partOf(b.name)), out = [];
+      for (let i = 0; i < g.position.count; i += 3) {
+        let k = 0; for (let m = 1; m < 4; m++) if (wt[i * 4 + m] > wt[i * 4 + k]) k = m;
+        let p = part[idx[i * 4 + k]];
+        if (p.startsWith("knee")) {
+          vb.fromBufferAttribute(g.position, i); B.boneTransform(i, vb); vb.applyMatrix4(B.matrixWorld);
+          if (vb.distanceTo(kneeAt[p[4]]) > 10) p = "leg";
+        }
+        out.push(i, PARTS.indexOf(p));
       }
-      // hips where the pose says, lowest point on the mat
-      root.position.set(0, 0, 0); root.updateMatrixWorld(true);
-      bones.thigh_r.getWorldPosition(va); bones.thigh_l.getWorldPosition(vb); va.add(vb).multiplyScalar(0.5);
-      let low = Infinity;
-      for (const [n, rr] of CONTACT) { bones[n].getWorldPosition(vb); low = Math.min(low, vb.y - rr * SC); }
-      root.position.set(r.px - va.x, -low, -va.z);
-      // hands near the mat lie flat, fingers forward, palm down
-      for (const [hn, fore, sgn] of [["hand_r", r.a[1], 1], ["hand_l", r.A[1], -1]]) {
-        const I = info[hn]; I.b.getWorldPosition(vb);
-        const fa = ((fore % 360) + 540) % 360 - 180;
-        const k = Math.min(1, Math.max(0, (10 - (vb.y + root.position.y)) / 6)) * Math.min(1, Math.max(0, -Math.sin(rad(fa)) * 2 - 0.6));
-        if (k <= 0) continue;
-        qz.setFromAxisAngle(Z, rad(fa * (1 - k)) - I.th0);
-        q1.copy(qz).multiply(I.qn).multiply(I.rest);
-        q2.setFromAxisAngle(va.set(1, 0, 0), -sgn * Math.PI / 2 * k); q1.premultiply(q2);
-        I.b.parent.getWorldQuaternion(q2).invert(); I.b.quaternion.copy(q2.multiply(q1));
-      }
-      const s = 1 + breath * 0.015; bones.spine_03.scale.set(s, 1, s); // breathing
-      // settle the skin itself onto the mat
+      return Int32Array.from(out);
+    });
+    // lowest point (y, and its x) of each part
+    function measure() {
       root.updateMatrixWorld(true);
-      let m = Infinity;
-      for (const B of skins) {
-        const pos = B.geometry.attributes.position;
-        for (let i = 0; i < pos.count; i += 4) { vb.fromBufferAttribute(pos, i); B.boneTransform(i, vb); vb.applyMatrix4(B.matrixWorld); if (vb.y < m) m = vb.y; }
+      const m = {}; for (const p of PARTS) m[p] = { y: Infinity, x: 0 };
+      skins.forEach((B, s) => {
+        const pos = B.geometry.attributes.position, S = samples[s];
+        for (let j = 0; j < S.length; j += 2) {
+          vb.fromBufferAttribute(pos, S[j]); B.boneTransform(S[j], vb); vb.applyMatrix4(B.matrixWorld);
+          const L = m[PARTS[S[j + 1]]]; if (vb.y < L.y) { L.y = vb.y; L.x = vb.x; }
+        }
+      });
+      return m;
+    }
+
+    // the toe bones, which follow the foot unless they are bent flat on the mat
+    const toe = {};
+    for (const [n, foot] of [["ball_r", "foot_r"], ["ball_l", "foot_l"]]) {
+      const b = bones[n], rest = b.getWorldQuaternion(new THREE.Quaternion());
+      const d0 = new THREE.Vector3(0, 1, 0).applyQuaternion(rest), nd = new THREE.Vector3(d0.x, d0.y, 0).normalize();
+      const th0 = Math.atan2(nd.y, nd.x);
+      toe[n] = { b, rest, qn: new THREE.Quaternion().setFromUnitVectors(d0, nd), th0, local: b.quaternion.clone(), off: deg(th0 - info[foot].th0) };
+    }
+
+    // each palm's normal in its hand bone's frame: across the knuckles, on the side the fingers curl to
+    const palm = {};
+    for (const sd of ["r", "l"]) {
+      const w = n => bones[n + "_" + sd].getWorldPosition(new THREE.Vector3()), I = info["hand_" + sd];
+      const n = new THREE.Vector3(0, 1, 0).applyQuaternion(I.rest).cross(w("pinky_01").sub(w("index_01"))).normalize();
+      if (n.dot(w("middle_03").sub(w("middle_01"))) < 0) n.negate();
+      palm["hand_" + sd] = n.applyQuaternion(I.rest.clone().invert());
+    }
+    const DOWN = new THREE.Vector3(0, -1, 0), vc = new THREE.Vector3(), qI = new THREE.Quaternion();
+    const thumb = { hand_r: { b: bones.thumb_01_r, rest: bones.thumb_01_r.quaternion.clone() }, hand_l: { b: bones.thumb_01_l, rest: bones.thumb_01_l.quaternion.clone() } };
+    // the fingers of a hand on the mat straighten out from their relaxed curl
+    const fingers = { hand_r: [], hand_l: [] };
+    for (const sd of ["r", "l"]) for (const f of ["index", "middle", "ring", "pinky", "thumb"]) for (const i of ["01", "02", "03"]) {
+      if (f === "thumb" && i === "01") continue; // laid into the palm's plane in apply()
+      const b = bones[`${f}_${i}_${sd}`], rest = b.quaternion.clone();
+      const y = new THREE.Vector3(0, 1, 0).applyQuaternion(rest);
+      fingers["hand_" + sd].push({ b, rest, flat: new THREE.Quaternion().setFromUnitVectors(y, new THREE.Vector3(0, 1, 0)).multiply(rest) });
+    }
+
+    function setWorld(I, a) { // point a bone along angle a (degrees) in the side view
+      qz.setFromAxisAngle(Z, rad(a) - I.th0);
+      q1.copy(qz).multiply(I.qn).multiply(I.rest);
+      I.b.parent.getWorldQuaternion(q2).invert();
+      I.b.quaternion.copy(q2.multiply(q1));
+      I.b.updateMatrixWorld(true);
+    }
+    function apply(r, tw) {
+      for (const I of order) setWorld(I, DRIVE[I.b.name](r));
+      // weight-bearing hands lie flat, fingers forward, palm turned to the mat
+      // (a hand stays flat until it is well clear of the mat, so its fingers never dip into it)
+      for (const [hn, fore, k0] of [["hand_r", r.a[1], c01((8 - tw.up.handR) / 5)], ["hand_l", r.A[1], c01((8 - tw.up.handL) / 5)]]) {
+        const fa = w180(fore), k = k0 * c01(-Math.sin(rad(fa)) * 2 - 0.6);
+        for (const F of fingers[hn]) F.b.quaternion.copy(F.rest).slerp(F.flat, k);
+        const th = thumb[hn]; th.b.quaternion.copy(th.rest);
+        if (k <= 0) continue;
+        const I = info[hn];
+        setWorld(I, fa * (1 - k)); // q1 is now the hand's world rotation
+        va.set(0, 1, 0).applyQuaternion(q1); vb.copy(palm[hn]).applyQuaternion(q1); // along the hand, out of the palm
+        const roll = Math.atan2(vc.crossVectors(vb, DOWN).dot(va), vb.dot(DOWN) - vb.dot(va) * DOWN.dot(va));
+        q2.setFromAxisAngle(va, roll * k); q1.premultiply(q2);
+        I.b.parent.getWorldQuaternion(q2).invert(); I.b.quaternion.copy(q2.multiply(q1)); I.b.updateMatrixWorld(true);
+        // the thumb swings up level with the palm
+        th.b.updateMatrixWorld(true);
+        th.b.getWorldQuaternion(q1); va.set(0, 1, 0).applyQuaternion(q1); vb.copy(palm[hn]).applyQuaternion(I.b.getWorldQuaternion(q2));
+        vc.copy(va).addScaledVector(vb, -va.dot(vb)).normalize();
+        q2.setFromUnitVectors(va, vc).slerp(qI, 1 - k); q1.premultiply(q2);
+        th.b.parent.getWorldQuaternion(q2).invert(); th.b.quaternion.copy(q2.multiply(q1)); th.b.updateMatrixWorld(true);
       }
-      root.position.y -= m;
+      // weight-bearing toes on a steep foot bend up to lie flat on the mat
+      for (const [n, f, k0] of [["ball_r", r.l[2], tw.footR], ["ball_l", r.L[2], tw.footL]]) {
+        const T = toe[n], fa = w180(f), k = k0 * c01(-Math.sin(rad(fa)) * 2 - 0.8);
+        if (k <= 0) { T.b.quaternion.copy(T.local); T.b.updateMatrixWorld(true); continue; }
+        const nat = fa + T.off; // where the toes point with the foot as it is
+        setWorld(T, nat + k * Math.min(90, Math.max(0, -nat)));
+      }
+    }
+    const turn = (r, d) => ({ ...r, t: r.t + d, u: r.u + d, n: r.n + d,
+      a: r.a.map(x => x + d), A: r.A.map(x => x + d), l: r.l.map(x => x + d), L: r.L.map(x => x + d) });
+    const at = n => { bones[n].getWorldPosition(va); return [va.x, va.y]; };
+    function ik2(A, T, l1, l2, b) { // two-bone IK in the side view, as in figure.js
+      const dx = T[0] - A[0], dy = T[1] - A[1], d = Math.min(Math.max(Math.hypot(dx, dy), Math.abs(l1 - l2) + 0.01), l1 + l2 - 0.01);
+      const a1 = Math.atan2(dy, dx) + b * Math.acos(Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))));
+      const M = [A[0] + l1 * Math.cos(a1), A[1] + l1 * Math.sin(a1)];
+      return [deg(a1), deg(Math.atan2(T[1] - M[1], T[0] - M[0]))];
+    }
+    const LIMBS = [["handR", null, "a", ["upperarm_r", "lowerarm_r", "hand_r"], -1], ["handL", null, "A", ["upperarm_l", "lowerarm_l", "hand_l"], -1],
+      ["footR", "kneeR", "l", ["thigh_r", "calf_r", "foot_r"], 1], ["footL", "kneeL", "L", ["thigh_l", "calf_l", "foot_l"], 1]];
+    const BODY = ["hips", "trunk", "head"], SUPPORT = ["handR", "handL", "footR", "footL", "kneeR", "kneeL"];
+
+    function pose(r0, breath) {
+      const tw = touch(r0);
+      root.position.set(0, 0, 0);
+      const s = 1 + breath * 0.015; bones.spine_03.scale.set(s, 1, s); // breathing
+      let r = r0;
+      apply(r, tw); let m = measure();
+      const body = BODY.filter(p => tw[p] >= 0.5);
+      // a knee on the mat carries the leg; its foot is then laid down by swinging the shin
+      const sup = SUPPORT.filter(p => tw[p] > 0 && !(p === "footR" && tw.kneeR > 0) && !(p === "footL" && tw.kneeL > 0));
+      const strong = sup.filter(p => tw[p] >= 0.5);
+      if (!body.length && strong.length) {
+        // held up on hands, knees or feet: tip the whole body so the outermost hand, knee or foot ends
+        // sit at the same heights as in the 2D pose (on the mat, or as far above it), fading out from 5 units up
+        const ends = SUPPORT.filter(p => tw.up[p] < 10 && !(p === "footR" && tw.kneeR > 0) && !(p === "footL" && tw.kneeL > 0));
+        const fade = p => c01((10 - tw.up[p]) / 5), hgt = p => m[p].y - Math.max(0, tw.up[p]);
+        for (let it = 0; it < 2 && ends.length > 1; it++) {
+          // the outermost ends; of two at much the same place, the one nearer the mat
+          const x0 = Math.min(...ends.map(p => m[p].x)), x1 = Math.max(...ends.map(p => m[p].x));
+          const pick = near => ends.filter(near).reduce((q, p) => tw.up[p] < tw.up[q] ? p : q);
+          const a = pick(p => m[p].x < x0 + 15), b = pick(p => m[p].x > x1 - 15);
+          const dx = m[b].x - m[a].x;
+          if (dx < 20) break;
+          const d = -deg(Math.atan2(hgt(b) - hgt(a), dx)) * Math.min(fade(a), fade(b));
+          if (Math.abs(d) < 0.05) break;
+          r = turn(r, Math.max(-12, Math.min(12, d))); apply(r, tw); m = measure();
+        }
+      }
+      // then each limb reaches the mat if it should touch, and comes up out of it if it sinks
+      const ground = Math.min(...(body.length ? body : strong.length ? strong : sup.length ? sup : PARTS).map(p => m[p].y));
+      let nr = null;
+      const lift = (part, w) => { const gap = m[part].y - ground; return gap > 0 ? -gap * w : -gap; }; // how far to move a part
+      // turn a pose angle about a pivot so that a point at x moves up by dy
+      const swing = (pivot, x, dy) => Math.abs(x - pivot[0]) < 8 ? 0 : deg(Math.asin(Math.max(-0.5, Math.min(0.5, dy / (x - pivot[0])))));
+      // an upper back that should rest on the mat tips down to it at the waist, before the arms are placed
+      // (full within 2 units of the mat in the 2D pose, fading out by 4, so it eases in and out as the back curls)
+      const wt = c01((4 - tw.up.trunk) / 2) * Math.max(tw.hips, tw.head);
+      if (wt > 0) {
+        const want = (ground - m.trunk.y) * wt, sw = Math.max(-12, Math.min(12, swing(at("spine_02"), m.trunk.x, want)));
+        if (sw) {
+          const r1 = { ...r, u: r.u + sw }; apply(r1, tw); const m1 = measure();
+          // on a steep back the swing can roll a different part of it down; keep it only if it helped
+          if (Math.abs(m.trunk.y + want - m1.trunk.y) < Math.abs(want)) { r = r1; m = m1; } else apply(r, tw);
+        }
+      }
+      for (const [foot, knee, key, ch, b] of LIMBS) {
+        const A = at(ch[0]), B = at(ch[1]), C = at(ch[2]), l1 = Math.hypot(B[0] - A[0], B[1] - A[1]);
+        if (knee && tw[knee] > 0 && tw[knee] >= tw[foot]) {
+          // knee down: swing the thigh, then the shin so the foot lies on the mat too
+          const dk = lift(knee, tw[knee]);
+          const th = Math.atan2(B[1] - A[1], B[0] - A[0]), sn = Math.max(-1, Math.min(1, (B[1] + dk - A[1]) / l1));
+          const th2 = Math.abs(dk) < 0.2 ? deg(th) : deg(Math.cos(th) >= 0 ? Math.asin(sn) : Math.PI - Math.asin(sn));
+          const g = m[foot].y + dk - ground, df = g > 0 ? -g * tw[foot] : -g;
+          const sw = Math.abs(df) < 0.2 ? 0 : swing([B[0], B[1] + dk], m[foot].x, df);
+          if (Math.abs(dk) < 0.2 && !sw) continue;
+          nr = nr || { ...r };
+          nr[key] = [th2, r[key][1] + sw, r[key][2] + sw];
+        } else {
+          const dy = lift(foot, tw[foot]);
+          if (Math.abs(dy) < 0.2) continue;
+          nr = nr || { ...r };
+          const [a1, a2] = ik2(A, [C[0], C[1] + dy], l1, Math.hypot(C[0] - B[0], C[1] - B[1]), b);
+          nr[key] = key === "a" || key === "A" ? [a1, a2] : [a1, a2, r[key][2]];
+        }
+      }
+      // a head that should rest on the mat tips down to it at the neck
+      if ((body.length > 1 || wt > 0) && tw.head >= 0.5) {
+        const dh = lift("head", tw.head), sw = Math.abs(dh) < 0.3 ? 0 : swing(at("neck_01"), m.head.x, dh);
+        if (sw) { nr = nr || { ...r }; nr.n = r.n + sw; }
+      }
+      if (nr) { r = nr; apply(r, tw); m = measure(); }
+      // hips where the pose says, the lowest skin on the mat
+      bones.thigh_r.getWorldPosition(va); bones.thigh_l.getWorldPosition(vb); va.add(vb).multiplyScalar(0.5);
+      root.position.set(r0.px - va.x, -Math.min(...PARTS.map(p => m[p].y)), -va.z);
       root.updateMatrixWorld(true);
     }
 
