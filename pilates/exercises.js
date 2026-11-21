@@ -141,6 +141,7 @@
     poses: [{ ...CURL, l: TABLE, a: [-10, -12] }, { ...CURL, l: TABLE, a: [-3, -6] }],
   });
   ex("chest-lift", "Chest Lift", {
+    in3d: "laced",
     type: "reps", reps: "8 reps", cyc: 4,
     setup: "Lie on your back, knees bent, feet flat. Lace your hands behind your head, elbows wide.",
     move: "Nod your chin and curl your head and shoulders up to the bottom of your shoulder blades, then lower with control.",
@@ -200,6 +201,7 @@
     ],
   });
   ex("criss-cross", "Criss-Cross", {
+    in3d: "criss-cross",
     type: "reps", reps: "10 reps (5 each side)", cyc: 3,
     setup: "Lie on your back, hands behind your head, curl up and bring your legs to tabletop.",
     move: "Rotate your upper body to bring one shoulder towards the opposite knee while that leg draws in and the other extends. Switch sides through the centre.",
@@ -287,6 +289,7 @@
     poses: [{ t: 9, u: 9, n: 14, l: [189, 189, -125], a: [-90, 0] }],
   });
   ex("side-plank", "Side Plank", {
+    lie: "side-plank", // the 3D figure is up on its lower hand
     type: "hold", sides: true,
     setup: "Lie on your side and prop up on your hand (or forearm), shoulder over wrist, legs long and stacked.",
     move: "Lift your hips so your body forms a straight line. Reach the top arm to the ceiling.",
@@ -319,6 +322,7 @@
     ],
   });
   ex("side-leg-lift", "Side Leg Lift", {
+    lie: "side", // the 3D figure lies on its side
     type: "reps", sides: true, reps: "10 reps", cyc: 3,
     setup: "Lie on your side with your head resting on your lower arm and your body in one long line. Place your top hand on the mat in front of your chest.",
     move: "Lift the top leg to hip height or a little higher, then lower with control.",
@@ -331,6 +335,7 @@
     ],
   });
   ex("leg-circles", "Single Leg Circles", {
+    in3d: "leg-circles",
     type: "reps", sides: true, reps: "5 circles each way", cyc: 4,
     setup: "Lie on your back, arms by your sides. Bend one knee with the foot down and lift the other leg towards the ceiling.",
     move: "Draw small circles with the raised leg: across the body, down, around and up. Reverse halfway.",
@@ -357,6 +362,7 @@
     ],
   });
   ex("heel-squeeze", "Prone Heel Squeeze", {
+    in3d: "heel-squeeze",
     type: "reps", reps: "10 reps", cyc: 3,
     setup: "Lie face down with your forehead on your hands. Bend your knees, open them wide and press your heels together.",
     move: "Squeeze your heels together and lift your knees a few centimetres off the mat, then lower.",
@@ -449,13 +455,14 @@
     poses: [PLANK, { ...PLANK, l: [214, 214, 214], L: PLANK.l }],
   });
   ex("shoulder-taps", "Plank Shoulder Taps", {
-    type: "reps", reps: "10 reps (5 each side)", cyc: 2.5,
+    in3d: "shoulder-taps",
+    type: "reps", reps: "10 reps (5 each side)", cyc: 5,
     setup: "Start in a plank, feet a little wider than usual for balance.",
     move: "Lift one hand to tap the opposite shoulder, then put it down and switch.",
     breath: "Breathe out on each tap.",
     focus: "Keep the hips square – resist rocking side to side.",
     easier: "Do it from your knees.",
-    poses: [PLANK, { ...PLANK, a: { to: ["S", -2, -9] }, A: PLANK.a }],
+    poses: [PLANK, { ...PLANK, a: { to: ["S", -2, -9] }, A: PLANK.a }, PLANK, { ...PLANK, a: PLANK.a, A: { to: ["S", -2, -9] } }],
   });
   ex("plank-pike", "Plank to Pike", {
     type: "reps", reps: "6 slow reps", cyc: 5,

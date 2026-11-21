@@ -280,6 +280,7 @@
 
     const model = gltf.scene, root = new THREE.Group();
     model.rotation.y = Math.PI / 2; // the model faces +z; the pose figure faces +x
+    root.rotation.order = "ZYX"; // the side poses roll first, then tip
     root.add(model); root.scale.setScalar(SC); scene.add(root);
     const bones = {};
     model.traverse(o => {
@@ -406,6 +407,7 @@
       fingers["hand_" + sd].push({ b, rest, flat: new THREE.Quaternion().setFromUnitVectors(y, new THREE.Vector3(0, 1, 0)).multiply(rest) });
     }
 
+    const ARM_OUT = 10; // degrees
     function setWorld(I, a) { // point a bone along angle a (degrees) in the side view
       qz.setFromAxisAngle(Z, rad(a) - I.th0);
       q1.copy(qz).multiply(I.qn).multiply(I.rest);
@@ -422,6 +424,19 @@
         const fa = w180(f), k = c01((9 - up) / 3) * c01((45 - Math.abs(fa)) / 15), I = info[n];
         flat[n] = { k, fa: fa + k * (deg(I.th0) - fa) };
         if (k > 0) setWorld(I, flat[n].fa);
+      }
+      // straight arms long by the sides angle slightly out, so the hands sit beside the hips rather than in them
+      // (fading out as an arm lifts away from the body or bends to hold a leg or a hip)
+      // (a hand on the mat counts further from the trunk's line, as the hips rise off the mat in a bridge)
+      for (const [sd, a, out, up] of [["r", r.a, 1, tw.up.handR], ["l", r.A, -1, tw.up.handL]]) {
+        const c = Math.cos(rad(a[0] - (r.t + r.u) / 2 - 180));
+        const k = Math.max(c01((c - 0.891) / 0.087), c01((c - 0.75) / 0.12) * c01((6 - up) / 3)) * c01((Math.cos(rad(a[1] - a[0])) - 0.85) / 0.1);
+        if (k <= 0) continue;
+        const U = info["upperarm_" + sd].b;
+        va.set(Math.cos(rad(a[0])), Math.sin(rad(a[0])), 0);
+        vb.copy(va).addScaledVector(Z, out * Math.tan(rad(ARM_OUT)) * k).normalize();
+        q2.setFromUnitVectors(va, vb); U.getWorldQuaternion(q1).premultiply(q2);
+        U.parent.getWorldQuaternion(q2).invert(); U.quaternion.copy(q2.multiply(q1)); U.updateMatrixWorld(true);
       }
       // weight-bearing hands lie flat, fingers forward, palm turned to the mat
       // (a hand stays flat until it is well clear of the mat, so its fingers never dip into it)
@@ -464,10 +479,12 @@
       ["footR", "kneeR", "l", ["thigh_r", "calf_r", "foot_r"], 1], ["footL", "kneeL", "L", ["thigh_l", "calf_l", "foot_l"], 1]];
     const BODY = ["hips", "trunk", "head"], SUPPORT = ["handR", "handL", "footR", "footL", "kneeR", "kneeL"];
 
-    function pose(r0, breath) {
-      const tw = touch(r0);
-      root.position.set(0, 0, 0);
+    function pose(r0, breath, lie, finish, beat) {
+      root.position.set(0, 0, 0); root.rotation.set(0, 0, 0);
       const s = 1 + breath * 0.015; bones.spine_03.scale.set(s, 1, s); // breathing
+      if (lie === "side") return poseOnSide(r0);
+      if (lie === "side-plank") return poseSidePlank(r0);
+      const tw = touch(r0);
       let r = r0;
       apply(r, tw); let m = measure();
       const body = BODY.filter(p => tw[p] >= 0.5);
@@ -539,6 +556,7 @@
       root.position.set(r0.px - va.x, -Math.min(...PARTS.map(p => m[p].y)), -va.z);
       root.updateMatrixWorld(true);
       restHands(r0, tw);
+      if (finish) { FINISH[finish](beat); settle(); }
     }
 
     // ---- hands resting on the body ----
@@ -571,33 +589,171 @@
       for (const [sd, Hd] of [["r", j.a.Hd], ["l", j.A.Hd]]) {
         const k = tw.hips * onBody(r0, j, Hd);
         if (k <= 0) continue;
-        const U = bones["upperarm_" + sd], L = bones["lowerarm_" + sd], H = bones["hand_" + sd];
-        U.getWorldPosition(rS); L.getWorldPosition(rE); H.getWorldPosition(rH);
-        const l1 = rS.distanceTo(rE), l2 = rE.distanceTo(rH);
-        bones.spine_02.getWorldPosition(rC);
+        bones["upperarm_" + sd].getWorldPosition(rS); bones.spine_02.getWorldPosition(rC);
         const side = Math.sign(rS.z - rC.z) || 1, wx = rC.x - 3, wz = rC.z + side * 10;
         rF.set(0.45, 0, -side * 0.89).normalize();  // fingers towards the navel
         const [tw0, tw1] = skinTop([[wx, wz], [wx + rF.x * 12, wz + rF.z * 12]]);
         if (!isFinite(tw0) || !isFinite(tw1)) continue;
         rT.set(wx, tw0 + 2.2, wz);
         rF.y = (tw1 - tw0) / 12; rF.normalize();    // along the curve of the belly
-        // two-bone reach, the elbow relaxed outwards and down
-        rD.subVectors(rT, rS); const d = Math.min(rD.length(), l1 + l2 - 0.01); rD.normalize();
-        const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
-        rP.set(-0.15, -0.45, side * 0.88); rP.addScaledVector(rD, -rP.dot(rD)).normalize();
-        const E = rS.clone().addScaledVector(rD, a).addScaledVector(rP, h);
-        pointBone(U, rE.clone().sub(rS).normalize(), E.clone().sub(rS).normalize(), k);
-        L.getWorldPosition(rE); H.getWorldPosition(rH);
-        pointBone(L, rH.clone().sub(rE).normalize(), rT.clone().sub(rE).normalize(), k);
-        // the hand lies along the belly, palm down
-        H.getWorldQuaternion(rq); pointBone(H, rN.set(0, 1, 0).applyQuaternion(rq).clone(), rF, k);
-        H.getWorldQuaternion(rq); const ax = rN.set(0, 1, 0).applyQuaternion(rq).clone(), pn = palm["hand_" + sd].clone().applyQuaternion(rq);
-        const roll = Math.atan2(vc.crossVectors(pn, DOWN).dot(ax), pn.dot(DOWN) - pn.dot(ax) * DOWN.dot(ax));
-        rq.premultiply(rq2.setFromAxisAngle(ax, roll * k)); H.parent.getWorldQuaternion(rq2).invert();
-        H.quaternion.copy(rq2.multiply(rq)); H.updateMatrixWorld(true);
-        for (const F of fingers["hand_" + sd]) { F.b.quaternion.copy(F.rest).slerp(F.flat, k * 0.7); F.b.updateMatrixWorld(true); }
+        reachHand(sd, rT, rP.set(-0.15, -0.45, side * 0.88), rF, DOWN, k, 0.7); // elbow relaxed outwards and down
       }
     }
+    // two-bone reach in 3D: wrist to T, elbow towards the pole, fingers along F, palm facing N
+    function reachHand(sd, T, pole, F, N, k, flat) {
+      const U = bones["upperarm_" + sd], L = bones["lowerarm_" + sd], H = bones["hand_" + sd];
+      U.getWorldPosition(rS); L.getWorldPosition(rE); H.getWorldPosition(rH);
+      const l1 = rS.distanceTo(rE), l2 = rE.distanceTo(rH);
+      rD.subVectors(T, rS); const d = Math.min(rD.length(), l1 + l2 - 0.01); rD.normalize();
+      const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+      const P = pole.clone().addScaledVector(rD, -pole.dot(rD)).normalize();
+      const E = rS.clone().addScaledVector(rD, a).addScaledVector(P, h);
+      pointBone(U, rE.clone().sub(rS).normalize(), E.clone().sub(rS).normalize(), k);
+      L.getWorldPosition(rE); H.getWorldPosition(rH);
+      pointBone(L, rH.clone().sub(rE).normalize(), T.clone().sub(rE).normalize(), k);
+      H.getWorldQuaternion(rq); pointBone(H, rN.set(0, 1, 0).applyQuaternion(rq).clone(), F, k);
+      H.getWorldQuaternion(rq); const ax = rN.set(0, 1, 0).applyQuaternion(rq).clone(), pn = palm["hand_" + sd].clone().applyQuaternion(rq);
+      const roll = Math.atan2(vc.crossVectors(pn, N).dot(ax), pn.dot(N) - pn.dot(ax) * N.dot(ax));
+      rq.premultiply(rq2.setFromAxisAngle(ax, roll * k)); H.parent.getWorldQuaternion(rq2).invert();
+      H.quaternion.copy(rq2.multiply(rq)); H.updateMatrixWorld(true);
+      for (const G of fingers["hand_" + sd]) { G.b.quaternion.copy(G.rest).slerp(G.flat, k * flat); G.b.updateMatrixWorld(true); }
+    }
+
+    // ---- lying on the side ----
+    // The side-view angles can't turn the body to face the viewer, so the figure is posed flat, its limbs
+    // are moved across the body in 3D, and the whole figure then rolls a quarter turn onto its right side:
+    // head on the lower arm, legs stacked, top hand on the mat in front of the chest. The pose's near thigh
+    // angle says how far the top leg lifts.
+    const Y = new THREE.Vector3(0, 1, 0), NEAR = new THREE.Vector3(0, 0, 1);
+    const NO_TOUCH = { up: { handR: 99, handL: 99, footR: 99, footL: 99 }, footR: 0, footL: 0 };
+    function spin(n, axis, d) { // turn a bone by d degrees about a world axis
+      const b = bones[n];
+      b.getWorldQuaternion(rq).premultiply(rq2.setFromAxisAngle(axis, rad(d)));
+      b.parent.getWorldQuaternion(rq2).invert();
+      b.quaternion.copy(rq2.multiply(rq)); b.updateMatrixWorld(true);
+    }
+    const swingY = (n, d) => spin(n, Y, d); // + moves something pointing along +x towards -z
+    function nearSide() { // how far each part reaches to the near side, which becomes the mat after the roll
+      root.updateMatrixWorld(true);
+      const z = {}; for (const p of PARTS) z[p] = -Infinity;
+      skins.forEach((B, s) => {
+        const pos = B.geometry.attributes.position, S = samples[s];
+        for (let j = 0; j < S.length; j += 2) {
+          vb.fromBufferAttribute(pos, S[j]); B.boneTransform(S[j], vb); vb.applyMatrix4(B.matrixWorld);
+          const p = PARTS[S[j + 1]]; if (vb.z > z[p]) z[p] = vb.z;
+        }
+      });
+      return z;
+    }
+    const FLAT_ON_SIDE = { t: 180, u: 180, n: 180, a: [176, 176], A: [180, 180], l: [0, 0, 60], L: [0, 0, 60] };
+    // the side bends that lay this body on the mat (worked out once): the waist curves so hip and shoulder
+    // both touch, the lower leg and arm lie on the mat, the head rests on the arm, the top leg on the lower leg
+    let sideFit = null;
+    function fitOnSide() {
+      const f = {}, tip = (d, len) => deg(Math.asin(Math.max(-0.5, Math.min(0.5, d / len))));
+      let z = nearSide();
+      f.spine_02 = -tip(Math.max(z.trunk, z.arm) - z.hips, 28); swingY("spine_02", f.spine_02); z = nearSide();
+      f.thigh_r = -tip(z.hips - z.footR, 85); swingY("thigh_r", f.thigh_r); z = nearSide();
+      f.thigh_l = -tip(z.footR - 8 - z.footL, 85); swingY("thigh_l", f.thigh_l); z = nearSide();
+      f.upperarm_r = tip(z.hips - z.handR, 52); swingY("upperarm_r", f.upperarm_r); z = nearSide();
+      f.neck_01 = tip(z.hips - 7 - z.head, 17); swingY("neck_01", f.neck_01);
+      return f;
+    }
+    function poseOnSide(r0) {
+      apply({ ...r0, ...FLAT_ON_SIDE }, NO_TOUCH);
+      if (!sideFit) { sideFit = fitOnSide(); apply({ ...r0, ...FLAT_ON_SIDE }, NO_TOUCH); }
+      for (const n in sideFit) swingY(n, sideFit[n] + (n === "thigh_l" ? w180(r0.l[0]) : 0));
+      const z = nearSide();
+      bones.spine_03.getWorldPosition(rC);
+      reachHand("l", rT.set(rC.x + 2, rC.y + 26, z.hips - 4.5), rP.set(0.15, 0.6, -0.8), rF.set(0.35, 0.94, 0).normalize(), NEAR, 1, 0.85);
+      root.rotation.x = Math.PI / 2; root.updateMatrixWorld(true);
+      bones.thigh_r.getWorldPosition(va); bones.thigh_l.getWorldPosition(vb); va.add(vb).multiplyScalar(0.5);
+      const cx = va.x, cz = va.z, m = measure();
+      root.position.set(r0.px - cx, -Math.min(...PARTS.map(p => m[p].y)), -cz);
+      root.updateMatrixWorld(true);
+    }
+    // up on the lower hand: a straight line from stacked feet to shoulder, top arm to the ceiling
+    function poseSidePlank(r0) {
+      apply({ ...r0, ...FLAT_ON_SIDE }, NO_TOUCH);
+      swingY("thigh_r", 5); swingY("thigh_l", -5);
+      root.rotation.x = Math.PI / 2; root.updateMatrixWorld(true);
+      const S = bones.upperarm_r.getWorldPosition(new THREE.Vector3()), F = bones.foot_r.getWorldPosition(new THREE.Vector3());
+      const El = bones.lowerarm_r.getWorldPosition(new THREE.Vector3()), W = bones.hand_r.getWorldPosition(new THREE.Vector3());
+      root.rotation.z = -Math.asin(Math.min(0.7, (S.distanceTo(El) + El.distanceTo(W) + 3) / Math.hypot(S.x - F.x, S.y - F.y)));
+      root.updateMatrixWorld(true);
+      bones.thigh_r.getWorldPosition(va); bones.thigh_l.getWorldPosition(vb); va.add(vb).multiplyScalar(0.5);
+      const cx = va.x, cz = va.z;
+      root.position.set(r0.px - cx, -bones.foot_r.getWorldPosition(vb).y + 3, -cz); root.updateMatrixWorld(true);
+      bones.upperarm_r.getWorldPosition(S);
+      reachHand("r", rT.set(S.x, 3, S.z + 1), rP.set(0, 0, -1), rF.set(-0.2, 0, 0.98).normalize(), DOWN, 1, 0.85);
+      bones.upperarm_l.getWorldPosition(S);
+      reachHand("l", rT.set(S.x, S.y + 60, S.z), rP.set(-1, 0, 0), rF.set(0, 1, 0), NEAR, 1, 0.4);
+      settle();
+    }
+    function settle() { // the lowest skin back on the mat after a 3D move
+      const m = measure(); root.position.y -= Math.min(...PARTS.map(p => m[p].y)); root.updateMatrixWorld(true);
+    }
+
+    // ---- movement the side-view angles can't show ----
+    // Added after the pose is solved; named by an exercise's "in3d". The beat says how far through its keys it is.
+    const X = new THREE.Vector3(1, 0, 0), keyed = (vals, b) => vals[b.i] * (1 - b.k) + vals[(b.i + 1) % vals.length] * b.k;
+    const hU = rv(), hF = rv(), hS = rv(), hC = rv(), hq = new THREE.Quaternion();
+    function headFrame() { // the head's centre, and its up, face and side directions
+      const I = info.Head; I.b.getWorldQuaternion(hq).multiply(rq2.copy(I.rest).invert());
+      hU.set(0, 1, 0).applyQuaternion(hq); hF.set(1, 0, 0).applyQuaternion(hq); hS.set(0, 0, 1).applyQuaternion(hq);
+      I.b.getWorldPosition(hC).addScaledVector(hU, 9);
+    }
+    function lacedHands() { // hands behind the head, fingers meeting, elbows wide
+      headFrame();
+      for (const [sd, o] of [["r", 1], ["l", -1]]) {
+        rT.copy(hC).addScaledVector(hF, -11).addScaledVector(hS, o * 6);
+        rT.y = Math.max(rT.y, 2.5);
+        const pole = hS.clone().multiplyScalar(o).addScaledVector(hF, 0.15);
+        reachHand(sd, rT, pole, hS.clone().multiplyScalar(-o).addScaledVector(hU, 0.3).normalize(), hF.clone(), 1, 0.25);
+      }
+    }
+    const FINISH = {
+      laced: lacedHands,
+      "criss-cross"(b) { // the chest turns towards the knee that is drawn in
+        const d = keyed([1, -1], b) * 17;
+        bones.spine_01.getWorldPosition(va); bones.spine_03.getWorldPosition(vb);
+        const ax = vb.clone().sub(va).normalize();
+        spin("spine_02", ax, -d); spin("spine_03", ax, -d);
+        lacedHands();
+      },
+      "heel-squeeze"(b) { // flat on the front, forehead on the hands, knees wide, shins angled in so the heels meet
+        const m = measure();
+        root.position.y -= Math.min(m.trunk.y, m.hips.y, m.head.y); root.updateMatrixWorld(true); // elbows no longer prop the chest up
+        headFrame();
+        for (const [sd, o] of [["r", 1], ["l", -1]]) {
+          rT.copy(hC).addScaledVector(hF, 9).addScaledVector(hU, 3).addScaledVector(hS, o * 6);
+          rT.y = Math.max(3, rT.y - 4);
+          reachHand(sd, rT, rP.set(0.2, -0.25, o), rF.set(0.1, 0, -o).normalize(), DOWN, 1, 0.8);
+        }
+        const mid = (bones.thigh_r.getWorldPosition(va).z + bones.thigh_l.getWorldPosition(vb).z) / 2;
+        const m1 = measure(), lift = keyed([0, 5], b);
+        for (const [sd, o, knee] of [["r", 1, m1.kneeR.y], ["l", -1, m1.kneeL.y]]) {
+          spin("thigh_" + sd, Y, o * 26);
+          const H = bones["thigh_" + sd].getWorldPosition(rv()), K0 = bones["calf_" + sd].getWorldPosition(rv());
+          spin("thigh_" + sd, Z, deg(Math.asin(Math.max(-0.5, Math.min(0.5, (knee - lift) / H.distanceTo(K0))))));
+          const K = bones["calf_" + sd].getWorldPosition(rv()), A = bones["foot_" + sd].getWorldPosition(rv());
+          const len = K.distanceTo(A), dx = A.x - K.x, dz = mid + o * 2 - K.z;
+          const T = rv().set(A.x, K.y + Math.sqrt(Math.max(1, len * len - dx * dx - dz * dz)), mid + o * 2);
+          pointBone(bones["calf_" + sd], A.clone().sub(K).normalize(), T.sub(K).normalize(), 1);
+          spin("foot_" + sd, Y, -o * 50);
+        }
+      },
+      "shoulder-taps"(b) { // from its place on the mat, a hand arcs up to the other shoulder and back
+        for (const [sd, other, e, o] of [["r", "l", keyed([0, 1, 0, 0], b), 1], ["l", "r", keyed([0, 0, 0, 1], b), -1]]) {
+          if (e <= 0) continue;
+          const T = bones["hand_" + sd].getWorldPosition(rv());
+          bones["upperarm_" + other].getWorldPosition(rC); rC.x += 3; rC.y -= 3; rC.z += o * 2;
+          T.lerp(rC, e); T.y += Math.sin(Math.PI * e) * 6;
+          reachHand(sd, T, rP.set(0.1, 0.3, o), rF.set(0.2, 0.3, -o).normalize(), Y, c01(e * 3), 0.3);
+        }
+      },
+      "leg-circles"(b) { spin("thigh_r", X, keyed([1, 0, -1, 0], b) * 14); }, // top, across, down, out
+    };
 
     // camera: a three-quarter view framed on everything the exercise does
     const AZ = rad(42), EL = rad(13), target = new THREE.Vector3();
@@ -634,11 +790,14 @@
 
   // ---- animation (as figure.js, plus a pause at each end, follow-through and breathing) ----
   const smoother = k => k * k * k * (k * (k * 6 - 15) + 10);
+  function beatAt(n, cyc, t) { // which key the movement is leaving, and how far towards the next
+    const pos = ((t % cyc) + cyc) % cyc / cyc * n, i = Math.floor(pos);
+    return { i, k: smoother(Math.min(1, Math.max(0, (pos - i - 0.12) / 0.76))) };
+  }
   function frameAt(keys, cyc, t) {
     if (keys.length === 1) return keys[0];
-    const n = keys.length, pos = ((t % cyc) + cyc) % cyc / cyc * n, i = Math.floor(pos);
-    const k = smoother(Math.min(1, Math.max(0, (pos - i - 0.12) / 0.76)));
-    return Figure.mix(keys[i], keys[(i + 1) % n], k);
+    const { i, k } = beatAt(keys.length, cyc, t);
+    return Figure.mix(keys[i], keys[(i + 1) % keys.length], k);
   }
 
   function mount(el, ex, { mirror = false, paused = false, flat = false } = {}) {
@@ -653,10 +812,10 @@
     const lag = ex.poses.every(p => [p.a, p.A].every(s => !s || Array.isArray(s) || s.at));
 
     function render() {
-      let r, breath = 0;
+      let r, breath = 0, beat = { i: keys.indexOf(still), k: 0 };
       if (reduce || keys.length < 2) r = still;
       else {
-        r = frameAt(keys, cyc, t);
+        r = frameAt(keys, cyc, t); beat = beatAt(keys.length, cyc, t);
         breath = Math.sin(t * 2 * Math.PI / 5);
         if (lag) {
           const ra = frameAt(keys, cyc, t - cyc * 0.05), rf = frameAt(keys, cyc, t - cyc * 0.09);
@@ -664,7 +823,8 @@
         }
         r = { ...r, n: frameAt(keys, cyc, t - cyc * 0.03).n + breath * 1.2, u: r.u + breath * 0.8 };
       }
-      E.pose(r, breath); E.draw();
+      if (ex.in3d === "shoulder-taps") r = { ...r, a: keys[0].a, A: keys[0].A }; // both hands stay planted; the tap is added in 3D
+      E.pose(r, breath, ex.lie, ex.in3d, beat); E.draw();
     }
     function loop(now) {
       if (!alive) return;
