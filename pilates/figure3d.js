@@ -128,6 +128,7 @@
     const order = []; model.traverse(o => { if (info[o.name]) order.push(info[o.name]); });
     const skins = []; model.traverse(o => { if (o.isSkinnedMesh && o.material !== mat.hair) skins.push(o); });
 
+    const c01 = x => Math.min(1, Math.max(0, x));
     function joints(r) {
       const P = [r.px, r.py], W = add(P, dir(r.t), LEN.lt), S = add(W, dir(r.u), LEN.ut);
       const Hc = add(add(S, dir(r.n), NECK), dir(r.n), HR);
@@ -135,10 +136,13 @@
       const leg = l => { const K = add(P, dir(l[0]), LEN.th), Ak = add(K, dir(l[1]), LEN.sh); return { K, Ak, T: add(Ak, dir(l[2]), LEN.ft) }; };
       return { P, W, S, Hc, a: arm(r.a), A: arm(r.A), l: leg(r.l), L: leg(r.L) };
     }
-    function lowest(j) {
+    // how far a hand rests on the belly of a figure lying on its back (those arms are placed in 3D, see restHands)
+    const onBody = (r, j, Hd) => Hd[1] <= j.W[1] ? 0 :
+      c01((-Math.cos(rad(r.t)) - 0.7) / 0.2) * c01((18 - Math.hypot(Hd[0] - j.W[0], Hd[1] - j.W[1])) / 4);
+    function lowest(j, r) {
       let m = Infinity; const c = (p, rr) => { m = Math.min(m, p[1] - rr); };
       c(j.P, 10); c(j.W, 10); c(j.S, 9); c(j.Hc, HR);
-      for (const s of [j.a, j.A]) { c(s.E, 4); c(s.Hd, 4); }
+      for (const s of [j.a, j.A]) { if (r && onBody(r, j, s.Hd) > 0) continue; c(s.E, 4); c(s.Hd, 4); }
       for (const s of [j.l, j.L]) { c(s.K, 6); c(s.Ak, 4.5); c(s.T, 3.4); }
       return m;
     }
@@ -146,11 +150,11 @@
     // ---- contact with the mat ----
     // The 3D body's proportions differ from the 2D figure's, so posing by the same angles leaves some
     // parts short of the mat. The 2D pose says which parts touch; the 3D pose is adjusted until they do.
-    const c01 = x => Math.min(1, Math.max(0, x)), w180 = x => ((x % 360) + 540) % 360 - 180, deg = x => x * 180 / Math.PI;
+    const w180 = x => ((x % 360) + 540) % 360 - 180, deg = x => x * 180 / Math.PI;
     // how firmly each part touches in the 2D pose: 1 on the mat, 0 from 3 units up
     // (tw.up holds each part's height above the mat in the 2D pose)
     function touch(r) {
-      const j = joints(r), lo = Math.min(0, lowest(j)), h = (p, rr) => p[1] - rr - lo;
+      const j = joints(r), lo = Math.min(0, lowest(j, r)), h = (p, rr) => p[1] - rr - lo;
       const up = { handR: h(j.a.Hd, 4), handL: h(j.A.Hd, 4), footR: Math.min(h(j.l.T, 3.4), h(j.l.Ak, 4.5)), footL: Math.min(h(j.L.T, 3.4), h(j.L.Ak, 4.5)),
         kneeR: h(j.l.K, 6), kneeL: h(j.L.K, 6), hips: Math.min(h(j.P, 10), h(j.W, 10)), trunk: h(j.S, 9), head: h(j.Hc, HR), arm: 99, leg: 99 };
       const tw = { up };
@@ -351,6 +355,65 @@
       bones.thigh_r.getWorldPosition(va); bones.thigh_l.getWorldPosition(vb); va.add(vb).multiplyScalar(0.5);
       root.position.set(r0.px - va.x, -Math.min(...PARTS.map(p => m[p].y)), -va.z);
       root.updateMatrixWorld(true);
+      restHands(r0, tw);
+    }
+
+    // ---- hands resting on the body ----
+    // The side-view angles can't reach across the body, so a hand on the belly of a figure lying on its
+    // back is placed in 3D: wrist on the lower ribs, fingers towards the navel, elbow relaxed out to the side.
+    const rv = () => new THREE.Vector3();
+    const rS = rv(), rE = rv(), rH = rv(), rT = rv(), rD = rv(), rP = rv(), rF = rv(), rN = rv(), rC = rv();
+    const rq = new THREE.Quaternion(), rq2 = new THREE.Quaternion();
+    function pointBone(b, from, to, k) { // turn a bone so that its direction "from" becomes "to", by k
+      const old = b.quaternion.clone();
+      b.getWorldQuaternion(rq).premultiply(rq2.setFromUnitVectors(from, to));
+      b.parent.getWorldQuaternion(rq2).invert();
+      b.quaternion.copy(old.slerp(rq2.multiply(rq), k)); b.updateMatrixWorld(true);
+    }
+    function skinTop(points) { // highest hip or trunk skin near each [x, z]
+      const top = points.map(() => -Infinity), hips = PARTS.indexOf("hips"), trunk = PARTS.indexOf("trunk");
+      skins.forEach((B, s) => {
+        const pos = B.geometry.attributes.position, S = samples[s];
+        for (let j = 0; j < S.length; j += 2) {
+          if (S[j + 1] !== hips && S[j + 1] !== trunk) continue;
+          vb.fromBufferAttribute(pos, S[j]); B.boneTransform(S[j], vb); vb.applyMatrix4(B.matrixWorld);
+          points.forEach((p, i) => { if (Math.abs(vb.x - p[0]) < 2.5 && Math.abs(vb.z - p[1]) < 2.5 && vb.y > top[i]) top[i] = vb.y; });
+        }
+      });
+      return top;
+    }
+    function restHands(r0, tw) {
+      const j = joints(r0);
+      if (tw.hips <= 0) return;
+      for (const [sd, Hd] of [["r", j.a.Hd], ["l", j.A.Hd]]) {
+        const k = tw.hips * onBody(r0, j, Hd);
+        if (k <= 0) continue;
+        const U = bones["upperarm_" + sd], L = bones["lowerarm_" + sd], H = bones["hand_" + sd];
+        U.getWorldPosition(rS); L.getWorldPosition(rE); H.getWorldPosition(rH);
+        const l1 = rS.distanceTo(rE), l2 = rE.distanceTo(rH);
+        bones.spine_02.getWorldPosition(rC);
+        const side = Math.sign(rS.z - rC.z) || 1, wx = rC.x - 3, wz = rC.z + side * 10;
+        rF.set(0.45, 0, -side * 0.89).normalize();  // fingers towards the navel
+        const [tw0, tw1] = skinTop([[wx, wz], [wx + rF.x * 12, wz + rF.z * 12]]);
+        if (!isFinite(tw0) || !isFinite(tw1)) continue;
+        rT.set(wx, tw0 + 2.2, wz);
+        rF.y = (tw1 - tw0) / 12; rF.normalize();    // along the curve of the belly
+        // two-bone reach, the elbow relaxed outwards and down
+        rD.subVectors(rT, rS); const d = Math.min(rD.length(), l1 + l2 - 0.01); rD.normalize();
+        const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+        rP.set(-0.15, -0.45, side * 0.88); rP.addScaledVector(rD, -rP.dot(rD)).normalize();
+        const E = rS.clone().addScaledVector(rD, a).addScaledVector(rP, h);
+        pointBone(U, rE.clone().sub(rS).normalize(), E.clone().sub(rS).normalize(), k);
+        L.getWorldPosition(rE); H.getWorldPosition(rH);
+        pointBone(L, rH.clone().sub(rE).normalize(), rT.clone().sub(rE).normalize(), k);
+        // the hand lies along the belly, palm down
+        H.getWorldQuaternion(rq); pointBone(H, rN.set(0, 1, 0).applyQuaternion(rq).clone(), rF, k);
+        H.getWorldQuaternion(rq); const ax = rN.set(0, 1, 0).applyQuaternion(rq).clone(), pn = palm["hand_" + sd].clone().applyQuaternion(rq);
+        const roll = Math.atan2(vc.crossVectors(pn, DOWN).dot(ax), pn.dot(DOWN) - pn.dot(ax) * DOWN.dot(ax));
+        rq.premultiply(rq2.setFromAxisAngle(ax, roll * k)); H.parent.getWorldQuaternion(rq2).invert();
+        H.quaternion.copy(rq2.multiply(rq)); H.updateMatrixWorld(true);
+        for (const F of fingers["hand_" + sd]) { F.b.quaternion.copy(F.rest).slerp(F.flat, k * 0.7); F.b.updateMatrixWorld(true); }
+      }
     }
 
     // camera: a three-quarter view framed on everything the exercise does
@@ -359,7 +422,7 @@
     function fit(keys) {
       let x0 = Infinity, x1 = -Infinity, y1 = 0;
       for (const r of keys) {
-        const j = joints(r), dy = Math.max(0, -lowest(j));
+        const j = joints(r), dy = Math.max(0, -lowest(j, r));
         for (const p of [j.P, j.S, j.Hc, j.a.Hd, j.A.Hd, j.l.T, j.L.T, j.l.K, j.a.E]) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1] + dy); }
         y1 = Math.max(y1, j.Hc[1] + dy + HR * 1.4);
       }
