@@ -1,9 +1,10 @@
 /* Tresza's Training — 3D lesson figure.
  * A skinned MakeHuman model (model/tresza_mh.json) whose bones follow the same pose
  * angles as the 2D figure in figure.js. Same API as Figure.mount: returns
- * { setPaused, stop }. Shows the 2D figure straight away and swaps to 3D once the
- * model has loaded; if WebGL or the model isn't available it simply stays 2D.
- * Needs figure.js loaded first. three.js is loaded on first use from vendor/. */
+ * { setPaused, stop }. Figure3D.preload() starts the loading and first-time work quietly
+ * when the app opens; prepare() (the lesson's loading screen) joins or finishes it. mount()
+ * never loads anything, so a figure can't pop in mid-lesson. Until prepare() has succeeded, mount() shows the 2D figure.
+ * Needs figure.js loaded first. three.js is loaded by prepare() from vendor/. */
 (function () {
   const rad = d => d * Math.PI / 180;
   const dir = d => [Math.cos(rad(d)), Math.sin(rad(d))];
@@ -20,23 +21,200 @@
     });
   }
 
-  // ---- loading (once) ----
-  let ready = null; // Promise<engine>
-  function load() {
-    if (!ready) {
-      ready = (async () => {
-        if (!webgl()) throw new Error("no WebGL");
-        if (!window.THREE) await script("vendor/three.min.js");
-        if (!THREE.GLTFLoader) await script("vendor/GLTFLoader.js");
-        const res = await fetch("model/tresza_mh.json");
-        if (!res.ok) throw new Error("model HTTP " + res.status);
-        const gltf = await parse(await res.json());
-        return engine(gltf);
-      })();
-      ready.catch(() => {});
+  // ---- loading (once; a failed or cancelled load can be tried again) ----
+  // sizes are only for the progress bar (unpacked bytes, as a fetch stream reports them)
+  const ASSETS = [
+    { f: "vendor/three.min.js", size: 607784 }, { f: "vendor/GLTFLoader.js", size: 103311 },
+    { f: "model/tresza_mh.json", size: 1600617 }, { f: "model/hair.png", size: 740648, tex: "hair" },
+    { f: "model/eye.png", size: 66425, tex: "eyes" }, { f: "model/brows.png", size: 27213, tex: "brows" },
+    { f: "model/lashes.png", size: 41956, tex: "lashes" },
+  ];
+  const NO_DATA_MS = 25000, NO_DATA_CACHED_MS = 5000; // give up on a silent connection (sooner if we hold a saved copy)
+  const stopIf = signal => { if (signal.aborted) throw new DOMException("Cancelled", "AbortError"); };
+  const pause = (ms = 0) => new Promise(ok => setTimeout(ok, ms)); // lets the phone draw and respond to taps
+  let files = {}, scripts = {}, built = null;
+
+  // One file as a Blob, kept so a retry resumes from what already arrived. If the network
+  // fails or goes quiet, falls back to the copy the service worker saved.
+  async function grab(a, signal, onBytes) {
+    if (files[a.f]) { onBytes(a.size); return files[a.f]; }
+    // the saved copy of this exact version needs no network at all
+    const v = (window.ASSET_VERSIONS || {})[a.f], url = v ? `${a.f}?v=${v}` : a.f;
+    let saved = null;
+    try {
+      if (window.caches) {
+        const exact = v ? await caches.match(url) : null;
+        if (exact) { files[a.f] = await exact.blob(); onBytes(a.size); return files[a.f]; }
+        saved = await caches.match(a.f, { ignoreSearch: true }); // an older version: the fallback if the network fails
+      }
+    } catch (e) {}
+    stopIf(signal);
+    const ctl = new AbortController(), onStop = () => ctl.abort();
+    signal.addEventListener("abort", onStop);
+    let timer = 0;
+    const watch = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { if (document.hidden) watch(); else ctl.abort(); }, saved ? NO_DATA_CACHED_MS : NO_DATA_MS);
+    };
+    try {
+      watch();
+      const res = await fetch(url, { signal: ctl.signal });
+      if (!res.ok) throw new Error(a.f + " HTTP " + res.status);
+      if (res.body) {
+        const rd = res.body.getReader(), parts = [];
+        for (let got = 0;;) {
+          const { done, value } = await rd.read();
+          if (done) break;
+          parts.push(value); got += value.length; watch(); onBytes(Math.min(got, a.size));
+        }
+        files[a.f] = new Blob(parts);
+      } else files[a.f] = await res.blob();
+    } catch (e) {
+      stopIf(signal);
+      if (!saved) throw e;
+      files[a.f] = await saved.blob();
+    } finally {
+      clearTimeout(timer); signal.removeEventListener("abort", onStop);
     }
-    return ready;
+    onBytes(a.size);
+    return files[a.f];
   }
+  function runScript(f) {
+    if (!scripts[f]) {
+      const url = URL.createObjectURL(files[f]);
+      scripts[f] = script(url).finally(() => URL.revokeObjectURL(url));
+      scripts[f].catch(() => { delete scripts[f]; });
+    }
+    return scripts[f];
+  }
+  function texture(a) {
+    const url = URL.createObjectURL(files[a.f]);
+    return new Promise((ok, bad) => new THREE.TextureLoader().load(url, ok, undefined, () => bad(new Error(a.f))))
+      .finally(() => URL.revokeObjectURL(url));
+  }
+  async function load(signal, report) {
+    if (built) return built;
+    if (!webgl()) throw Object.assign(new Error("no WebGL"), { noWebGL: true });
+    const total = ASSETS.reduce((n, a) => n + a.size, 0), got = {};
+    // let every file finish even if one fails, so "Try again" only has to fetch the failed ones
+    const results = await Promise.allSettled(ASSETS.map(a => grab(a, signal, n => {
+      got[a.f] = n; report("download", Object.values(got).reduce((x, y) => x + y, 0) / total);
+    })));
+    stopIf(signal);
+    const failed = results.find(r => r.status === "rejected");
+    if (failed) throw failed.reason;
+    report("build", 0); await pause();
+    if (!window.THREE) await runScript("vendor/three.min.js");
+    if (!THREE.GLTFLoader) await runScript("vendor/GLTFLoader.js");
+    stopIf(signal);
+    const tex = {};
+    await Promise.all(ASSETS.filter(a => a.tex).map(async a => { tex[a.tex] = await texture(a); }));
+    const g = JSON.parse(await files["model/tresza_mh.json"].text());
+    stopIf(signal); await pause();
+    const gltf = await parse(g);
+    stopIf(signal); await pause();
+    if (built) return built; // an earlier attempt got there first
+    built = engine(gltf, tex);
+    built.canvas.addEventListener("webglcontextlost", () => { preparedEx = new WeakSet(); }); // iOS can drop it in the background
+    files = {}; // the engine holds what it needs
+    return built;
+  }
+
+  // The one download-and-build in progress, shared by the quiet preload and the loading screen.
+  let job = null;
+  function engineJob() {
+    if (!job) {
+      const j = job = { ctrl: new AbortController(), last: null, subs: new Set() };
+      j.promise = load(j.ctrl.signal, (stage, k) => { j.last = [stage, k]; j.subs.forEach(f => f(stage, k)); })
+        .finally(() => { if (job === j) job = null; });
+      j.promise.catch(() => {});
+    }
+    return job;
+  }
+  // after iOS drops the graphics context, wait for it to come back before drawing
+  async function restored(E) {
+    if (!E.lost()) return;
+    await new Promise(ok => {
+      const done = () => { clearTimeout(t); E.canvas.removeEventListener("webglcontextrestored", done); ok(); };
+      const t = setTimeout(done, 5000);
+      E.canvas.addEventListener("webglcontextrestored", done);
+    });
+    if (E.lost()) throw new Error("graphics context lost");
+  }
+
+  // Everything a lesson's figure needs, done before the lesson starts: downloads, the model,
+  // shaders and textures (compiled and uploaded by the first draw) and each exercise's poses.
+  // el must be on the page and laid out. onProgress(stage, 0..1); stage is "download" or "prepare".
+  let preparedEx = new WeakSet(), bg = null;
+  const isPrepared = exercises => !!built && !built.lost() && exercises.every(ex => preparedEx.has(ex));
+  async function prepare(exercises, el, { signal, onProgress = () => {} }) {
+    if (bg) bg.stop = true; // the loading screen takes over from the quiet preload
+    const DL = 0.8, BUILD = 0.05;
+    const report = (stage, k) => onProgress(stage === "download" ? "download" : "prepare",
+      stage === "download" ? k * DL : stage === "build" ? DL : DL + BUILD + k * (1 - DL - BUILD));
+    let E = built;
+    if (!E) {
+      const j = engineJob(), cancel = () => { j.ctrl.abort(); if (job === j) job = null; };
+      signal.addEventListener("abort", cancel);
+      j.subs.add(report);
+      if (j.last) report(...j.last); // carry on from wherever the preload has got to
+      try { E = await j.promise; }
+      finally { j.subs.delete(report); signal.removeEventListener("abort", cancel); }
+    }
+    stopIf(signal);
+    await restored(E);
+    stopIf(signal);
+    el.innerHTML = ""; el.appendChild(E.canvas); E.canvas.style.transform = ""; E.resize();
+    const todo = exercises.filter(ex => !preparedEx.has(ex));
+    const poses = todo.reduce((n, ex) => n + ex.poses.length, 0);
+    let done = 0;
+    report("poses", 0); await pause();
+    stopIf(signal);
+    for (const ex of todo) {
+      const keys = ex.poses.map(Figure.resolve);
+      E.fit(keys);
+      for (const r of keys) {
+        E.pose(r, 0); E.draw();
+        report("poses", ++done / poses);
+        await pause(); stopIf(signal);
+      }
+      preparedEx.add(ex);
+    }
+    report("poses", 1);
+  }
+
+  // The same work, unseen, while she's on the home screen. Failures are silent:
+  // the loading screen tries again and explains if she starts the lesson.
+  async function preload(exercises) {
+    if (bg || isPrepared(exercises)) return;
+    const me = bg = { stop: false };
+    let host = null;
+    try {
+      const E = built || await engineJob().promise;
+      if (me.stop) return;
+      await restored(E);
+      if (me.stop) return;
+      host = document.createElement("div"); host.className = "fig3d-host"; host.setAttribute("aria-hidden", "true");
+      document.body.appendChild(host); host.appendChild(E.canvas);
+      E.canvas.style.transform = ""; E.resize();
+      for (const ex of exercises) {
+        if (preparedEx.has(ex)) continue;
+        const keys = ex.poses.map(Figure.resolve);
+        E.fit(keys);
+        for (const r of keys) {
+          E.pose(r, 0); E.draw();
+          await pause(20); // gentler than the loading screen: she may be scrolling
+          if (me.stop) return;
+        }
+        preparedEx.add(ex);
+      }
+    } catch (e) {
+    } finally {
+      if (bg === me) bg = null;
+      if (host) host.remove();
+    }
+  }
+
   // The model ships as glTF JSON with its buffer inlined. Rebuild a GLB in memory so the
   // loader never has to fetch a data: URL (some hosts block that).
   function parse(g) {
@@ -53,7 +231,7 @@
   }
 
   // ---- the renderer, scene and rigged model (one of each, reused between exercises) ----
-  function engine(gltf) {
+  function engine(gltf, tex) {
     const LEN = Figure.LEN, HR = 11, NECK = 6;
     THREE.ColorManagement.legacyMode = false; // treat colour values as sRGB, as written
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -80,10 +258,7 @@
       eyes: M(0xFFFFFF, 0.25), brows: M(0x17110F, 1, { transparent: true, depthWrite: false }),
       lashes: M(0x17110F, 1, { transparent: true, depthWrite: false }), mat: M(0x9DC08F, 0.95),
     };
-    const tl = new THREE.TextureLoader();
-    for (const [k, f] of [["hair", "hair.png"], ["eyes", "eye.png"], ["brows", "brows.png"], ["lashes", "lashes.png"]]) {
-      tl.load("model/" + f, tx => { tx.encoding = THREE.sRGBEncoding; tx.flipY = false; mat[k].map = tx; mat[k].needsUpdate = true; draw(); });
-    }
+    for (const k in tex) { tex[k].encoding = THREE.sRGBEncoding; tex[k].flipY = false; mat[k].map = tex[k]; }
     const matMesh = new THREE.Mesh(new THREE.BoxGeometry(240, 3, 80), mat.mat); matMesh.position.y = -1.5; matMesh.receiveShadow = true; scene.add(matMesh);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.ShadowMaterial({ opacity: 0.12 }));
     floor.rotation.x = -Math.PI / 2; floor.position.y = -3.01; floor.receiveShadow = true; scene.add(floor);
@@ -454,7 +629,7 @@
       w = nw; h = nh; renderer.setSize(w, h, false); aim(); return true;
     }
     function draw() { if (box && w) renderer.render(scene, camera); }
-    return { canvas, pose, fit, resize, draw };
+    return { canvas, pose, fit, resize, draw, lost: () => renderer.getContext().isContextLost() };
   }
 
   // ---- animation (as figure.js, plus a pause at each end, follow-through and breathing) ----
@@ -466,9 +641,11 @@
     return Figure.mix(keys[i], keys[(i + 1) % n], k);
   }
 
-  function mount(el, ex, { mirror = false, paused = false } = {}) {
-    const flat = Figure.mount(el, ex, { mirror, paused }); // shows at once; replaced when 3D is ready
-    let alive = true, isPaused = paused, raf = 0, t = 0, last = null, E = null, ro = null;
+  function mount(el, ex, { mirror = false, paused = false, flat = false } = {}) {
+    if (bg) bg.stop = true; // a lesson is starting: nothing else may move the figure
+    const E = flat ? null : built;
+    if (!E) return Figure.mount(el, ex, { mirror, paused }); // 3D didn't load: 2D for the whole lesson
+    let alive = true, isPaused = paused, raf = 0, t = 0, last = null;
     const keys = ex.poses.map(Figure.resolve), cyc = ex.cyc || 4;
     const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
     const still = keys[ex.key ?? (keys.length > 1 ? 1 : 0)];
@@ -500,23 +677,19 @@
       if (alive && E && !raf && !isPaused && !reduce) { last = null; raf = requestAnimationFrame(loop); }
     }
 
-    load().then(engine => {
-      if (!alive) return;
-      E = engine; flat.stop();
-      el.innerHTML = ""; el.appendChild(E.canvas);
-      E.canvas.style.transform = mirror ? "scaleX(-1)" : "";
-      E.resize(); E.fit(keys); render(); start();
-      ro = new ResizeObserver(() => { if (E.resize()) render(); }); ro.observe(E.canvas);
-    }, () => {}); // no WebGL or no model: the 2D figure stays
+    el.innerHTML = ""; el.appendChild(E.canvas);
+    E.canvas.style.transform = mirror ? "scaleX(-1)" : "";
+    E.resize(); E.fit(keys); render(); start();
+    const ro = new ResizeObserver(() => { if (alive && E.resize()) render(); }); ro.observe(E.canvas);
 
     return {
       setPaused(p) {
-        isPaused = p; flat.setPaused(p);
+        isPaused = p;
         if (p) { cancelAnimationFrame(raf); raf = 0; } else start();
       },
-      stop() { alive = false; cancelAnimationFrame(raf); flat.stop(); if (ro) ro.disconnect(); },
+      stop() { alive = false; cancelAnimationFrame(raf); ro.disconnect(); },
     };
   }
 
-  window.Figure3D = { mount, load };
+  window.Figure3D = { mount, prepare, preload, isPrepared };
 })();

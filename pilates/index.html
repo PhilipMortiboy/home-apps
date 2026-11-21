@@ -191,6 +191,22 @@
   .cbtn.main svg { width: 32px; height: 32px; }
   .cbtn small { display: none; }
 
+  /* ---------- lesson loading screen ---------- */
+  .fig3d-host { position: fixed; left: -1000px; top: 0; width: 343px; height: 240px; opacity: 0; pointer-events: none; }
+  .fig3d-host .fig3d { display: block; width: 100%; height: 100%; }
+  .loader { position: absolute; inset: 0; z-index: 10; background: var(--bg); display: flex; flex-direction: column; justify-content: center; overflow-y: auto;
+    padding: calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 20px); }
+  .loader-in { width: 100%; max-width: 480px; margin: 0 auto; animation: loader-in .25s .2s both; } /* a very short load never flashes */
+  @keyframes loader-in { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .loader-in { animation-duration: .01s; } }
+  .loader .fig { background: #fff; border: 1px solid var(--line); border-radius: var(--r); padding: 4px; }
+  .loader .fig svg { height: min(190px, 26vh); }
+  .loader h1 { margin-top: 20px; font-size: 25px; }
+  .load-bar { height: 8px; margin-top: 18px; background: var(--sand); border-radius: 4px; overflow: hidden; }
+  .load-bar i { display: block; height: 100%; width: 0; background: var(--sage); border-radius: 4px; transition: width .2s linear; }
+  .load-line { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .loader .note { color: var(--ink); }
+
   .finish { text-align: center; padding-top: 40px; }
   .finish .done-tick { width: 84px; height: 84px; font-size: 44px; margin: 0 auto 18px; }
 </style>
@@ -328,9 +344,24 @@
     <button class="cbtn main" id="pPlay" aria-label="Pause"></button>
     <button class="cbtn" id="pNext" aria-label="Skip"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l10.5-7z"/></svg></button>
   </div>
+  <div class="loader" id="loader" hidden>
+    <div class="loader-in">
+      <div class="fig" id="lFig" aria-hidden="true"></div>
+      <h1 id="lTitle"></h1>
+      <div id="lProgress">
+        <div class="load-bar" role="progressbar" aria-label="Loading the lesson" aria-valuemin="0" aria-valuemax="100" id="lBarWrap"><i id="lBar"></i></div>
+        <div class="load-line" role="status"><span id="lStatus"></span><span id="lPct"></span></div>
+      </div>
+      <p class="note" id="lNote" role="alert" hidden></p>
+      <button class="btn" id="lStart" hidden></button>
+      <button class="btn quiet" id="lRetry" hidden>Try again</button>
+      <button class="btn ghost" id="lCancel">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <script src="figure.js"></script>
+<script src="asset-versions.js"></script>
 <script src="figure3d.js"></script>
 <script src="exercises.js"></script>
 <script src="achievements.js"></script>
@@ -664,22 +695,120 @@
   function releaseWake() { try { wake && wake.release(); } catch (e) {} wake = null; }
 
   // ---------- player ----------
-  const P = { lesson: null, steps: [], idx: 0, left: 0, endAt: 0, running: false, timer: 0, fig: null, figKey: "", lastSec: null };
+  const P = { lesson: null, steps: [], idx: 0, left: 0, endAt: 0, running: false, timer: 0, fig: null, figKey: "", lastSec: null, flat: false };
   const ARC = 276.46;
   const ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
   const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M7 4.5v15L19.5 12z"/></svg>';
 
   function startLesson(l) {
     unlockAudio();
-    P.lesson = l; P.steps = buildSteps(l); P.idx = 0; P.figKey = "";
+    P.lesson = l; P.steps = buildSteps(l); P.idx = 0; P.figKey = ""; P.flat = false;
     window.__sheet(false);
     views.forEach(v => { $(v).hidden = true; });
-    $("player").hidden = false;
+    $("player").hidden = false; // stays underneath the loading screen, so the figure has its real size
     keepAwake();
+    if (Figure3D.isPrepared(lessonExercises(l))) return beginLesson();
+    openLoader(l);
+  }
+  function beginLesson() {
+    $("loader").hidden = true;
     enterStep(0, true);
     play();
     sound("start");
   }
+
+  // ---------- loading screen: everything the figure needs, before the lesson clock starts ----------
+  const SLOW_MS = 12000;
+  let loadRun = null; // { ctrl, slow } while a load is under way or waiting to start
+  const lessonExercises = l => [...new Set(l.items.map(it => it.e))].map(id => byId[id]);
+  function loaderUI({ title, status = "", pct = null, note = "", start = "", retry = false }) {
+    if (title) $("lTitle").textContent = title;
+    $("lProgress").hidden = pct == null;
+    if (pct != null) {
+      const n = Math.round(pct * 100);
+      $("lBar").style.width = n + "%"; $("lBarWrap").setAttribute("aria-valuenow", n);
+      $("lPct").textContent = n + "%"; $("lStatus").textContent = status;
+    }
+    $("lNote").hidden = !note; $("lNote").textContent = note;
+    $("lStart").hidden = !start; $("lStart").textContent = start;
+    $("lRetry").hidden = !retry;
+  }
+  // get today's lesson ready in the background, so the loading screen is short or not needed
+  function preloadToday() {
+    if (!$("player").hidden || doneToday()) return;
+    Figure3D.preload(lessonExercises(pickNext(state.history)));
+  }
+  function endLoadRun() {
+    if (!loadRun) return;
+    clearTimeout(loadRun.slow); loadRun.ctrl.abort(); loadRun = null;
+  }
+  function openLoader(l) {
+    $("lFig").innerHTML = Figure.still(byId[l.items[0].e]);
+    $("loader").hidden = false;
+    runLoad(l);
+  }
+  async function runLoad(l) {
+    endLoadRun();
+    const run = loadRun = { ctrl: new AbortController(), slow: 0 };
+    let shown = { pct: 0, status: "Getting started" };
+    const paint = extra => loaderUI({ title: "Getting your lesson ready", ...shown, ...extra });
+    paint();
+    run.slow = setTimeout(() => {
+      if (loadRun === run) { run.isSlow = true; paint(slowOffer); }
+    }, SLOW_MS);
+    const slowOffer = { note: "This is taking a while. You can keep waiting, or start now with the simple drawn figure.", start: "Start with simple figure" };
+    try {
+      await Figure3D.prepare(lessonExercises(l), $("pFig"), {
+        signal: run.ctrl.signal,
+        onProgress(stage, k) {
+          if (loadRun !== run) return;
+          shown = { pct: k, status: stage === "download" ? "Downloading the 3D figure" : "Preparing the movements" };
+          paint(run.isSlow ? slowOffer : {});
+        },
+      });
+    } catch (e) {
+      if (loadRun !== run) return;
+      endLoadRun();
+      const why = e.noWebGL ? "This phone can't show the 3D figure."
+        : navigator.onLine === false ? "You're offline and the 3D figure isn't saved on this phone yet."
+        : "The 3D figure didn't load.";
+      loaderUI({ title: "3D figure unavailable", note: why + " You can still do this lesson with the simple drawn figure.",
+        start: "Start with simple figure", retry: !e.noWebGL });
+      return;
+    }
+    if (loadRun !== run) return;
+    clearTimeout(run.slow);
+    loaderUI({ title: "Getting your lesson ready", pct: 1, status: "Ready" });
+    // don't start the clock while the app is in the background
+    while (document.hidden) {
+      await new Promise(ok => document.addEventListener("visibilitychange", ok, { once: true }));
+      if (loadRun !== run) return;
+    }
+    // sound may have stopped during a long wait: a tap is what brings it back on iOS
+    await wakeAudio();
+    if (loadRun !== run) return;
+    if (state.sound && actx && actx.state !== "running") {
+      loaderUI({ title: "Your lesson is ready", pct: 1, status: "Ready", start: "Start lesson" });
+      run.awaitTap = true;
+      return;
+    }
+    endLoadRun();
+    beginLesson();
+  }
+  $("lStart").onclick = () => {
+    unlockAudio();
+    if (!(loadRun && loadRun.awaitTap)) P.flat = true; // the 3D figure was not ready: 2D for this lesson
+    endLoadRun();
+    beginLesson();
+  };
+  $("lRetry").onclick = () => { unlockAudio(); runLoad(P.lesson); };
+  $("lCancel").onclick = () => {
+    endLoadRun();
+    $("loader").hidden = true;
+    stopPlayer();
+    openOverview(P.lesson.id, overviewFrom);
+    $("player").hidden = true;
+  };
   function stepEx(s) { return byId[P.lesson.items[s.i].e]; }
   function enterStep(i, announce) {
     P.idx = i;
@@ -700,7 +829,7 @@
     const key = ex.id + (mirror ? ":m" : "");
     if (key !== P.figKey) {
       if (P.fig) P.fig.stop();
-      P.fig = Figure3D.mount($("pFig"), ex, { mirror, paused: !P.running });
+      P.fig = Figure3D.mount($("pFig"), ex, { mirror, paused: !P.running, flat: P.flat });
       P.figKey = key;
       $("pSheetBody").scrollTop = 0;
     }
@@ -812,7 +941,7 @@
     window.scrollTo(0, 0);
   }
   document.addEventListener("visibilitychange", () => {
-    if ($("player").hidden) return;
+    if ($("player").hidden) { if (!document.hidden) preloadToday(); return; }
     if (document.hidden) { if (P.running) pause(); }
     else { keepAwake(); wakeAudio(); }
   });
@@ -858,7 +987,8 @@
   show("home");
   // a new day may start while the app sits open
   let shownDay = today();
-  setInterval(() => { if (today() !== shownDay) { shownDay = today(); if (!$("home").hidden) renderHome(); } }, 60000);
+  setInterval(() => { if (today() !== shownDay) { shownDay = today(); if (!$("home").hidden) renderHome(); preloadToday(); } }, 60000);
+  setTimeout(preloadToday, 400); // once the home screen has drawn
   if (location.protocol === "https:" && "serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 })();
 </script>
