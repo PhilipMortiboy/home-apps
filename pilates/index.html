@@ -83,6 +83,27 @@
   .count b { font-size: 26px; display: block; line-height: 1.1; }
   .count span { white-space: nowrap; }
 
+  .ach-box { display: block; width: 100%; margin-top: 14px; text-align: left; padding: 14px 12px 12px; }
+  .ach-box:active { transform: scale(.99); }
+  .ach-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 0 4px 10px; }
+  .ach-head b { font-size: 16px; }
+  .ach-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .ach-tile { text-align: center; min-width: 0; }
+  .ach-tile svg { display: block; width: 56px; height: 56px; margin: 0 auto 4px; }
+  .ach-tile .t { display: block; font-size: 12px; font-weight: 650; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ach-tile .s { display: block; font-size: 12px; line-height: 1.25; color: var(--muted); white-space: nowrap; }
+  .ach-row { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .ach-row:first-child { border-top: 0; }
+  .ach-row svg { flex: 0 0 52px; width: 52px; height: 52px; }
+  .ach-row .body { flex: 1; min-width: 0; }
+  .ach-row .name { font-weight: 650; }
+  .ach-row.todo .name { color: var(--muted); }
+  .ach-row .sub { color: var(--muted); font-size: 14px; line-height: 1.3; }
+  .ach-row .got { color: var(--sage-dk); font-size: 13px; font-weight: 600; margin-top: 2px; }
+  .ach-row .prog { font-size: 13px; font-weight: 600; color: var(--muted); margin-top: 3px; }
+  .ach-bar { height: 5px; background: var(--sand); border-radius: 3px; margin-top: 3px; overflow: hidden; }
+  .ach-bar i { display: block; height: 100%; background: var(--sage); border-radius: 3px; }
+
   .row { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
   .row:first-child { border-top: 0; }
   .thumb { flex: 0 0 92px; width: 92px; background: #fff; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; }
@@ -191,6 +212,8 @@
     <div class="dots" id="weekDots"></div>
   </div>
 
+  <button class="card ach-box" id="achBox" data-go="achievements"></button>
+
   <button class="btn ghost" id="openLibrary">Browse all lessons</button>
 
   <h3>Settings</h3>
@@ -227,6 +250,14 @@
   <p class="muted" style="margin-top:4px">15 minutes each. Any lesson you finish counts as today's.</p>
   <div class="chips" id="filters" role="group" aria-label="Filter by type" style="margin-top:14px"></div>
   <div id="libList"></div>
+</main>
+
+<!-- ACHIEVEMENTS -->
+<main id="achievements" class="wrap" hidden>
+  <button class="back" data-go="home">‹ Home</button>
+  <h1>Achievements</h1>
+  <p class="muted" id="achSummary" style="margin-top:4px"></p>
+  <div id="achList"></div>
 </main>
 
 <!-- OVERVIEW -->
@@ -292,6 +323,7 @@
 <script src="figure.js"></script>
 <script src="figure3d.js"></script>
 <script src="exercises.js"></script>
+<script src="achievements.js"></script>
 <script>
 (function () {
   "use strict";
@@ -303,11 +335,11 @@
 
   // ---------- storage (never rename this key) ----------
   const KEY = "tresza-training-v1";
-  const blank = () => ({ v: 1, history: [], voice: true, sound: true });
+  const blank = () => ({ v: 1, history: [], voice: true, sound: true, earned: {} });
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
-      if (s && Array.isArray(s.history)) return { ...blank(), ...s };
+      if (s && Array.isArray(s.history)) return { ...blank(), ...s, earned: ACH.clean(s.earned) };
     } catch (e) {}
     return blank();
   }
@@ -357,13 +389,14 @@
   const fmt = s => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 
   // ---------- navigation ----------
-  const views = ["home", "library", "overview", "finished"];
+  const views = ["home", "library", "achievements", "overview", "finished"];
   let overviewFrom = "home";
   function show(v) {
     views.forEach(id => { $(id).hidden = id !== v; });
     $("player").hidden = true;
     if (v === "home") renderHome();
     if (v === "library") renderLibrary();
+    if (v === "achievements") renderAchievements();
     window.scrollTo(0, 0);
   }
   document.addEventListener("click", e => {
@@ -409,9 +442,45 @@
     const days = new Set(inWeek.map(h => h.date));
     $("weekDots").innerHTML = ["M", "T", "W", "T", "F", "S", "S"].map((d, i) =>
       `<div class="dot${days.has(ws + i) ? " on" : ""}${ws + i === t ? " now" : ""}"><i></i>${d}</div>`).join("");
+    renderAchBox();
     setSwitch("tVoice", state.voice); setSwitch("tSound", state.sound);
   }
   $("openLibrary").onclick = () => show("library");
+
+  // ---------- achievements ----------
+  // Saves each newly earned badge, so later library changes can't take it away.
+  function allAch() {
+    const all = ACH.compute(state.history, lessons, cats, today(), state.earned);
+    const fresh = all.filter(a => a.earned && state.earned[a.id] !== a.earnedDay);
+    if (fresh.length) { fresh.forEach(a => { state.earned[a.id] = a.earnedDay; }); save(); }
+    return all;
+  }
+  const dayLabel = day => new Date(day * 864e5).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  function renderAchBox() {
+    const all = allAch(), got = all.filter(a => a.earned).length;
+    const box = $("achBox");
+    box.setAttribute("aria-label", `Achievements, ${got} of ${all.length} earned. Show all.`);
+    box.innerHTML = `
+      <div class="ach-head"><b>Achievements</b><span class="small muted">${got} of ${all.length} ›</span></div>
+      <div class="ach-grid">${ACH.pickHome(all).map(a => `
+        <div class="ach-tile">${ACH.badge(a)}<span class="t">${esc(a.short)}</span><span class="s">${a.earned ? "Earned" : `${a.have} of ${a.need}`}</span></div>`).join("")}
+      </div>`;
+  }
+  function renderAchievements() {
+    const all = allAch(), got = all.filter(a => a.earned).length;
+    $("achSummary").textContent = `${got} of ${all.length} earned`;
+    const groups = [...new Set(all.map(a => a.group))];
+    $("achList").innerHTML = groups.map(g => `
+      <h3>${esc(g)}</h3>
+      <div class="card" style="padding:4px 14px">${all.filter(a => a.group === g).map(a => `
+        <div class="ach-row${a.earned ? "" : " todo"}">${ACH.badge(a)}
+          <div class="body"><div class="name">${esc(a.name)}</div><div class="sub">${esc(a.detail)}</div>
+          ${a.earned ? `<div class="got">✓ Earned ${esc(dayLabel(a.earnedDay))}</div>`
+            : `<div class="prog">${esc(a.progress)}</div><div class="ach-bar"><i style="width:${Math.round(a.frac * 100)}%"></i></div>`}
+          </div>
+        </div>`).join("")}
+      </div>`).join("");
+  }
 
   // ---------- settings ----------
   function setSwitch(id, on) { $(id).setAttribute("aria-checked", on ? "true" : "false"); }
@@ -440,7 +509,7 @@
       data.history.every(h => h && typeof h.id === "string" && Number.isFinite(h.date) && Number.isFinite(h.ts));
     if (!ok) return backupMsg("That doesn't look like a backup from this app.", true);
     if (!confirm(`Replace this phone's history (${state.history.length} lessons) with the backup (${data.history.length} lessons)?`)) return;
-    state = { ...blank(), history: data.history, voice: data.voice !== false, sound: data.sound !== false };
+    state = { ...blank(), history: data.history, voice: data.voice !== false, sound: data.sound !== false, earned: ACH.clean(data.earned) };
     save(); $("restoreText").value = ""; $("restoreBox").hidden = true;
     renderHome(); backupMsg(`Restored ${data.history.length} lessons.`);
   };
@@ -720,6 +789,7 @@
     stopPlayer();
     state.history.push({ id: l.id, date: today(), ts: Date.now() });
     save();
+    allAch();
     const ws = weekStart();
     const n = state.history.filter(h => h.date >= ws).length;
     $("finTitle").textContent = l.title;
