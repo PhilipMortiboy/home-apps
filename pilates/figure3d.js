@@ -25,7 +25,7 @@
   // sizes are only for the progress bar (unpacked bytes, as a fetch stream reports them)
   const ASSETS = [
     { f: "vendor/three.min.js", size: 607784 }, { f: "vendor/GLTFLoader.js", size: 103311 },
-    { f: "model/tresza_mh.json", size: 1600617 }, { f: "model/hair.png", size: 740648, tex: "hair" },
+    { f: "model/tresza_mh.json", size: 1600622 }, { f: "model/hair.png", size: 740648, tex: "hair" },
     { f: "model/eye.png", size: 66425, tex: "eyes" }, { f: "model/brows.png", size: 27213, tex: "brows" },
     { f: "model/lashes.png", size: 41956, tex: "lashes" },
   ];
