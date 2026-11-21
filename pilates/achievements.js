@@ -47,6 +47,8 @@
         short: `${word} ×${n}`, mark: `×${n}`,
       }));
     });
+    // The last goal in each group earns a gold badge.
+    defs.forEach(d => { d.final = d.goal === Math.max(...defs.filter(x => x.group === d.group).map(x => x.goal)); });
     return defs;
   }
 
@@ -134,7 +136,7 @@
     const glyph = GLYPHS[a.kind === "set" ? a.cat : a.kind] || GLYPHS.core;
     const fg = a.earned ? "#FFFFFF" : "#8F968C";
     const ring = a.earned
-      ? '<circle cx="32" cy="32" r="30" fill="#56735A"/><circle cx="32" cy="32" r="26" fill="none" stroke="#DCE6D8" stroke-width="1.500" opacity=".7"/>'
+      ? `<circle cx="32" cy="32" r="30" fill="${a.final ? "#BC8E28" : "#56735A"}"/><circle cx="32" cy="32" r="26" fill="none" stroke="${a.final ? "#FBEFC9" : "#DCE6D8"}" stroke-width="1.500" opacity=".7"/>`
       : '<circle cx="32" cy="32" r="29" fill="#FFFCF6" stroke="#C9C3B5" stroke-width="2" stroke-dasharray="4 3.500"/>';
     return `<svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">${ring}` +
       `<g fill="none" stroke="${fg}" color="${fg}" stroke-width="2.400" stroke-linecap="round">${glyph}</g>` +
