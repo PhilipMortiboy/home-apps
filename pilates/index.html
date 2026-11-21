@@ -48,6 +48,7 @@
   .small { font-size: 14px; }
 
   .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .icon-btn { display: grid; place-items: center; flex: none; width: 44px; height: 44px; margin-right: -8px; color: var(--sage-dk); border-radius: 50%; }
   .date { color: var(--muted); font-size: 15px; margin-top: 4px; }
 
   .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; }
@@ -203,6 +204,9 @@
       <h1>Tresza's Training</h1>
       <div class="date" id="todayDate"></div>
     </div>
+    <button class="icon-btn" data-go="settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
   </div>
 
   <section id="todayCard"></section>
@@ -216,7 +220,15 @@
 
   <button class="btn ghost" id="openLibrary">Browse all lessons</button>
 
-  <h3>Settings</h3>
+  <p class="note">Stop if anything hurts and use the easier option. If you're pregnant, check with your GP or physiotherapist before starting.</p>
+</main>
+
+<!-- SETTINGS -->
+<main id="settings" class="wrap" hidden>
+  <button class="back" data-go="home">‹ Home</button>
+  <h1>Settings</h1>
+
+  <h3>Sounds</h3>
   <div class="card" style="padding:4px 16px">
     <div class="toggle"><span>Spoken “Next” cues</span><button class="switch" role="switch" id="tVoice" aria-label="Spoken cues"></button></div>
     <div class="toggle"><span>Chimes and countdown ticks</span><button class="switch" role="switch" id="tSound" aria-label="Chimes"></button></div>
@@ -239,8 +251,6 @@
     </div>
     <div class="msg" id="backupMsg" hidden></div>
   </div>
-
-  <p class="note">Stop if anything hurts and use the easier option. If you're pregnant, have recently had surgery or have a back or bone condition, check with your GP or physiotherapist before starting.</p>
 </main>
 
 <!-- LIBRARY -->
@@ -389,12 +399,13 @@
   const fmt = s => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 
   // ---------- navigation ----------
-  const views = ["home", "library", "achievements", "overview", "finished"];
+  const views = ["home", "settings", "library", "achievements", "overview", "finished"];
   let overviewFrom = "home";
   function show(v) {
     views.forEach(id => { $(id).hidden = id !== v; });
     $("player").hidden = true;
     if (v === "home") renderHome();
+    if (v === "settings") resetBackupPanel();
     if (v === "library") renderLibrary();
     if (v === "achievements") renderAchievements();
     window.scrollTo(0, 0);
@@ -489,6 +500,7 @@
 
   // ---------- backup ----------
   function backupMsg(t, err) { const m = $("backupMsg"); m.hidden = !t; m.textContent = t || ""; m.classList.toggle("err", !!err); }
+  function resetBackupPanel() { $("backupOut").hidden = true; $("restoreBox").hidden = true; $("restoreText").value = ""; backupMsg(""); }
   $("copyBackup").onclick = async () => {
     const text = JSON.stringify({ app: "tresza-training", ...state });
     $("restoreBox").hidden = true;
