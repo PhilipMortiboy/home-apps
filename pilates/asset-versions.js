@@ -2,7 +2,7 @@
 self.ASSET_VERSIONS = {
   "vendor/three.min.js": "f34446bf875b",
   "vendor/GLTFLoader.js": "b2edda923572",
-  "model/tresza_mh.json": "de197ebdf312",
+  "model/tresza_mh.json": "8533a2162c48",
   "model/hair.png": "e6ea461be7a9",
   "model/eye.png": "bbf60522e195",
   "model/brows.png": "4adae99426b3",
