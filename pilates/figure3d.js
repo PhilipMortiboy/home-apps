@@ -752,7 +752,10 @@
           reachHand(sd, T, rP.set(0.1, 0.3, o), rF.set(0.2, 0.3, -o).normalize(), Y, c01(e * 3), 0.3);
         }
       },
-      "leg-circles"(b) { spin("thigh_r", X, keyed([1, 0, -1, 0], b) * 14); }, // top, across, down, out
+      "leg-circles"(b) { // the raised leg's foot draws a circle: out, up, across, down
+        const a = (b.i + b.k) * Math.PI / 2;
+        spin("thigh_r", Z, 1 + Math.sin(a) * 15); spin("thigh_r", X, Math.cos(a) * 14);
+      },
     };
 
     // camera: a three-quarter view framed on everything the exercise does
@@ -794,6 +797,16 @@
     const pos = ((t % cyc) + cyc) % cyc / cyc * n, i = Math.floor(pos);
     return { i, k: smoother(Math.min(1, Math.max(0, (pos - i - 0.12) / 0.76))) };
   }
+  // Leg circles run at a steady speed, easing to a stop and back each time they change direction
+  // after 5 circles. The beat is the position around the circle, a quarter turn per key.
+  function circleBeat(cyc, t) {
+    const way = 5 * cyc, ease = cyc / 4, u = ((t % (2 * way)) + 2 * way) % (2 * way);
+    let p = u < way ? u : 2 * way - u;
+    if (p < ease) p = ease / 2 + p * p / (2 * ease);
+    else if (p > way - ease) p = way - ease / 2 - (way - p) * (way - p) / (2 * ease);
+    const pos = p / cyc * 4, whole = Math.floor(pos);
+    return { i: whole % 4, k: pos - whole };
+  }
   function frameAt(keys, cyc, t) {
     if (keys.length === 1) return keys[0];
     const { i, k } = beatAt(keys.length, cyc, t);
@@ -824,6 +837,10 @@
         r = { ...r, n: frameAt(keys, cyc, t - cyc * 0.03).n + breath * 1.2, u: r.u + breath * 0.8 };
       }
       if (ex.in3d === "shoulder-taps") r = { ...r, a: keys[0].a, A: keys[0].A }; // both hands stay planted; the tap is added in 3D
+      if (ex.in3d === "leg-circles") { // the leg holds its centre; the circle is added in 3D
+        r = { ...r, l: keys[0].l };
+        if (!reduce) beat = circleBeat(cyc, t);
+      }
       E.pose(r, breath, ex.lie, ex.in3d, beat); E.draw();
     }
     function loop(now) {

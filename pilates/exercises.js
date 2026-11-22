@@ -46,7 +46,7 @@
     breath: "Breathe out to round, in to lengthen and arch.",
     focus: "Start each movement from the pelvis and let the spine follow.",
     easier: "Keep the movement small and stay in a pain-free range.",
-    poses: [{ ...QUAD, t: -14, u: 24, n: 40 }, { ...QUAD, t: 32, u: -16, n: -66 }],
+    poses: [{ ...QUAD, t: -14, u: 24, n: 40 }, { ...QUAD, t: 46, u: -28, n: -70, y: 52 }],
   });
   ex("roll-down", "Standing Roll Down", {
     type: "reps", reps: "4 slow reps", cyc: 7,
@@ -336,7 +336,7 @@
   });
   ex("leg-circles", "Single Leg Circles", {
     in3d: "leg-circles",
-    type: "reps", sides: true, reps: "5 circles each way", cyc: 4,
+    type: "reps", sides: true, reps: "5 circles each way", cyc: 3,
     setup: "Lie on your back, arms by your sides. Bend one knee with the foot down and lift the other leg towards the ceiling.",
     move: "Draw small circles with the raised leg: across the body, down, around and up. Reverse halfway.",
     breath: "Breathe in for the first half of the circle, out for the second.",
@@ -381,7 +381,7 @@
     breath: "Breathe out to lift, in to lower.",
     focus: "Work from the glute; don't arch the back or tip the hips.",
     easier: "Make the lift smaller.",
-    poses: [{ ...QUAD, l: [-100, 172, 262], L: QUAD.l }, { ...QUAD, l: [176, 86, 176], L: QUAD.l }],
+    poses: [{ ...QUAD, L: QUAD.l }, { ...QUAD, l: [176, 86, 176], L: QUAD.l }],
   });
   ex("squat", "Pilates Squat", {
     type: "reps", reps: "10 slow reps", cyc: 4,
