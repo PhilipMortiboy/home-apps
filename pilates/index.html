@@ -184,6 +184,8 @@
   .steps dd { margin: 2px 0 0; }
   .steps .easy { background: var(--sage-lt); border-radius: 12px; padding: 10px 12px; margin-top: 14px; }
   .steps .easy dt { margin-top: 0; color: var(--sage-dk); }
+  .steps .hard { background: #F5E2AC; border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
+  .steps .hard dt { margin-top: 0; color: #BC8E28; }
   .p-ctrl { display: flex; align-items: center; justify-content: center; gap: 28px; padding: 10px 16px calc(env(safe-area-inset-bottom) + 12px); border-top: 1px solid var(--line); background: var(--card); }
   .cbtn { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--sand); }
   .cbtn.main { width: 72px; height: 72px; background: var(--sage-dk); color: #fff; }
@@ -851,7 +853,8 @@
     $("pSteps").innerHTML =
       `<dt>Set up</dt><dd>${esc(ex.setup)}</dd><dt>Move</dt><dd>${esc(ex.move)}</dd>` +
       `<dt>Breathe</dt><dd>${esc(ex.breath)}</dd><dt>Focus</dt><dd>${esc(ex.focus)}</dd>` +
-      `<div class="easy"><dt>Easier option</dt><dd>${esc(ex.easier)}</dd></div>`;
+      `<div class="easy"><dt>Easier option</dt><dd>${esc(ex.easier)}</dd></div>` +
+      (ex.harder ? `<div class="hard"><dt>Harder option</dt><dd>${esc(ex.harder)}</dd></div>` : "");
     renderTime();
   }
   function remainingTotal() {

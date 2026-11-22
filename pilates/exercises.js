@@ -137,7 +137,8 @@
     move: "Pump your arms up and down in small, firm movements while holding the curl.",
     breath: "Breathe in for 5 pumps and out for 5 pumps.",
     focus: "Keep your gaze on your belly and a gap the size of an orange under your chin.",
-    easier: "Keep your feet on the mat, or your head down. Harder: straighten your legs to 45 degrees.",
+    easier: "Keep your feet on the mat, or your head down.",
+    harder: "Straighten your legs to 45 degrees.",
     poses: [{ ...CURL, l: TABLE, a: [-10, -12] }, { ...CURL, l: TABLE, a: [-3, -6] }],
   });
   ex("chest-lift", "Chest Lift", {
