@@ -46,7 +46,7 @@
     breath: "Breathe out to round, in to lengthen and arch.",
     focus: "Start each movement from the pelvis and let the spine follow.",
     easier: "Keep the movement small and stay in a pain-free range.",
-    poses: [{ ...QUAD, t: -14, u: 24, n: 40 }, { ...QUAD, t: 46, u: -28, n: -70, y: 52 }],
+    poses: [{ ...QUAD, t: -14, u: 24, n: 40 }, { ...QUAD, t: 50, u: -30, n: -70 }],
   });
   ex("roll-down", "Standing Roll Down", {
     type: "reps", reps: "4 slow reps", cyc: 7,
