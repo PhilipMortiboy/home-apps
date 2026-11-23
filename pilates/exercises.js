@@ -228,9 +228,10 @@
     breath: "Breathe out as you lower, in as you lift.",
     focus: "Keep your low back steady – don't let it arch as the leg lowers.",
     easier: "Keep one foot on the mat while the other leg moves.",
+    blend: true,
     poses: [
-      { ...SUP, a: ARMS_DOWN, l: [36, -48, -20], L: TABLE },
-      { ...SUP, a: ARMS_DOWN, l: TABLE, L: [36, -48, -20] },
+      { ...SUP, a: ARMS_DOWN, l: [62, -70, -45], L: TABLE }, // foot pointed, so only the toes tap the mat
+      { ...SUP, a: ARMS_DOWN, l: TABLE, L: [62, -70, -45] },
     ],
   });
   ex("dead-bug", "Dead Bug", {
