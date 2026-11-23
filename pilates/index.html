@@ -877,7 +877,8 @@
     P.left = Math.max(0, P.endAt - performance.now());
     const sec = Math.ceil(P.left / 1000);
     if (sec !== P.lastSec) {
-      if (sec >= 1 && sec <= 5 && P.lastSec != null) sound("tick");
+      const from = P.steps[P.idx].kind === "work" ? 5 : 3; // countdown ticks: last 5s of an exercise, last 3s of a break
+      if (sec >= 1 && sec <= from && P.lastSec != null) sound("tick");
       P.lastSec = sec;
     }
     if (P.left <= 0) {
