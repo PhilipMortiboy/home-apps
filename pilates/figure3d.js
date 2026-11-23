@@ -480,6 +480,8 @@
     const BODY = ["hips", "trunk", "head"], SUPPORT = ["handR", "handL", "footR", "footL", "kneeR", "kneeL"];
 
     function pose(r0, breath, lie, finish, beat) {
+      if (finish && finish.blend) return poseBlend(finish, breath, lie, beat);
+      if (finish && finish.plant && !pins.has(finish)) capturePins(finish, lie);
       root.position.set(0, 0, 0); root.rotation.set(0, 0, 0);
       const s = 1 + breath * 0.015; bones.spine_03.scale.set(s, 1, s); // breathing
       if (lie === "side") return poseOnSide(r0);
@@ -556,7 +558,69 @@
       root.position.set(r0.px - va.x, -Math.min(...PARTS.map(p => m[p].y)), -va.z);
       root.updateMatrixWorld(true);
       restHands(r0, tw);
-      if (finish) { FINISH[finish](beat); settle(); }
+      if (finish && finish.plant) {
+        if (finish.then) FINISH[finish.then](beat);
+        holdPins(finish); settle();
+      } else if (finish) { FINISH[finish](beat); settle(); }
+    }
+    // ---- moves that lift a limb off the mat ----
+    // The contact solver changes its mind as a hand or knee leaves the mat, which shakes the body.
+    // An exercise with "blend" solves only its key poses and turns every joint smoothly between them.
+    const blends = new Map();
+    function poseBlend(spec, breath, lie, beat) {
+      let K = blends.get(spec);
+      if (!K) {
+        K = spec.keys.map(p => {
+          pose(Figure.resolve(p), 0, lie);
+          return { p: root.position.clone(), q: root.quaternion.clone(), b: Object.values(bones).map(b => b.quaternion.clone()) };
+        });
+        blends.set(spec, K);
+      }
+      const i = Math.max(0, beat ? beat.i : 0), k = beat ? beat.k : 0, A = K[i], B = K[(i + 1) % K.length];
+      root.position.lerpVectors(A.p, B.p, k); root.quaternion.slerpQuaternions(A.q, B.q, k);
+      Object.values(bones).forEach((b, j) => b.quaternion.slerpQuaternions(A.b[j], B.b[j], k));
+      const s = 1 + breath * 0.015; bones.spine_03.scale.set(s, 1, s);
+      root.updateMatrixWorld(true); settle();
+    }
+    // ---- hands and feet that stay planted ----
+    // An exercise's "plant" names the ends that keep the place and angle they have in its reference pose;
+    // the rest of the limb bends to meet them, whatever the body does.
+    const pins = new Map(), PIN_ENDS = { hands: ["hand", "lowerarm", "upperarm"], feet: ["foot", "calf", "thigh"] };
+    function capturePins(spec, lie) {
+      pose(Figure.resolve(spec.from), 0, lie);
+      const rec = [];
+      for (const part of spec.plant) for (const [sd, o] of [["r", 1], ["l", -1]]) {
+        const [e, l, u] = PIN_ENDS[part].map(n => bones[n + "_" + sd]), kids = [];
+        e.traverse(c => { if (c !== e && c.isBone) kids.push([c, c.quaternion.clone()]); });
+        rec.push({ part, o, u, l, e, kids, p: e.getWorldPosition(new THREE.Vector3()), q: e.getWorldQuaternion(new THREE.Quaternion()) });
+      }
+      pins.set(spec, rec);
+    }
+    function holdPins(spec) {
+      const rec = pins.get(spec);
+      if (spec.plant.includes("hands")) { // arms that are being moved no longer hold the body up
+        const m = measure();
+        root.position.y -= Math.min(...["footR", "footL", "kneeR", "kneeL", "hips", "trunk", "head", "leg"].map(p => m[p].y));
+        root.updateMatrixWorld(true);
+      }
+      for (const R of rec) {
+        R.u.getWorldPosition(rS); R.l.getWorldPosition(rE); R.e.getWorldPosition(rH);
+        const l1 = rS.distanceTo(rE), l2 = rE.distanceTo(rH);
+        rD.subVectors(R.p, rS); const d = Math.min(rD.length(), l1 + l2 - 0.01); rD.normalize();
+        const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+        // knees always bend to the front of the leg, so a nearly straight leg can't flip
+        const bend = R.part === "feet" ? rP.set(-rD.y, rD.x, 0) : spec.elbowsOut ? rP.set(-0.2, 0.4, R.o) : rP.subVectors(rE, rS);
+        const P = bend.clone().addScaledVector(rD, -bend.dot(rD));
+        if (P.length() < 0.5) P.set(0, 0, R.o).addScaledVector(rD, -R.o * rD.z);
+        P.normalize();
+        const E = rS.clone().addScaledVector(rD, a).addScaledVector(P, h);
+        pointBone(R.u, rE.clone().sub(rS).normalize(), E.sub(rS).normalize(), 1);
+        R.l.getWorldPosition(rE); R.e.getWorldPosition(rH);
+        pointBone(R.l, rH.clone().sub(rE).normalize(), R.p.clone().sub(rE).normalize(), 1);
+        R.e.parent.getWorldQuaternion(rq2).invert(); R.e.quaternion.copy(rq2.multiply(R.q));
+        for (const [c, q] of R.kids) c.quaternion.copy(q);
+        R.e.updateMatrixWorld(true);
+      }
     }
 
     // ---- hands resting on the body ----
@@ -749,7 +813,15 @@
           const T = bones["hand_" + sd].getWorldPosition(rv());
           bones["upperarm_" + other].getWorldPosition(rC); rC.x += 3; rC.y -= 3; rC.z += o * 2;
           T.lerp(rC, e); T.y += Math.sin(Math.PI * e) * 6;
-          reachHand(sd, T, rP.set(0.1, 0.3, o), rF.set(0.2, 0.3, -o).normalize(), Y, c01(e * 3), 0.3);
+          const w = c01(e * 3); // eases in, so the hand doesn't change speed as it takes over from the planted arm
+          reachHand(sd, T, rP.set(0.1, 0.3, o), rF.set(0.2, 0.3, -o).normalize(), Y, w * w * (3 - 2 * w), 0.3);
+        }
+      },
+      "arms-out"() { // bridges: both hands stay planted on the mat, 10 degrees out from the shoulders, while the hips move
+        const reach = 39, c = Math.cos(rad(10)), s = Math.sin(rad(10));
+        for (const [sd, o] of [["r", 1], ["l", -1]]) {
+          rT.set(-41.4 + reach * c, 4, o * (14.4 + reach * s));
+          reachHand(sd, rT, rP.set(0, 0, o), rF.set(c, 0, o * s), DOWN, 1, 0.8);
         }
       },
       "leg-circles"(b) { // the raised leg's foot draws a circle: out, up, across, down

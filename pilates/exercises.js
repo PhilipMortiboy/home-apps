@@ -18,7 +18,10 @@
   const HANDS_HEAD = { to: ["H", -5, 10], b: -1 };
 
   const X = [];
-  const ex = (id, name, o) => X.push({ id, name, ...o });
+  // plant: "hands", "feet" or both stay exactly where they are in the pose plantFrom (default the first)
+  // blend: turn each joint smoothly between the solved key poses, for a limb lifting off the mat
+  const ex = (id, name, o) => X.push({ id, name, ...o, ...(o.blend ? { in3d: { blend: true, keys: o.poses } } : {}), ...(o.plant ? { in3d: {
+    plant: o.plant.split(" "), then: o.in3d, from: o.poses[o.plantFrom || 0], elbowsOut: o.elbowsOut } } : {}) });
 
   // ---------- warm-up and mobility ----------
   ex("breathing", "Breathing & Imprint", {
@@ -37,6 +40,7 @@
     breath: "Breathe out to curl up, in at the top, out to roll down.",
     focus: "Move one vertebra at a time. Keep weight even on both feet.",
     easier: "Only lift as far as your low back – a small tilt is enough.",
+    in3d: "arms-out",
     poses: [{ ...BENT, anchor: "S", x: -50 }, { t: 205, u: 190, n: 180, y: 25, anchor: "S", x: -50, a: [0, 0], l: FEET }],
   });
   ex("cat-cow", "Cat-Cow", {
@@ -46,6 +50,7 @@
     breath: "Breathe out to round, in to lengthen and arch.",
     focus: "Start each movement from the pelvis and let the spine follow.",
     easier: "Keep the movement small and stay in a pain-free range.",
+    plant: "hands feet",
     poses: [{ ...QUAD, t: -14, u: 24, n: 40 }, { ...QUAD, t: 50, u: -30, n: -70 }],
   });
   ex("roll-down", "Standing Roll Down", {
@@ -55,6 +60,7 @@
     breath: "Breathe out to roll down, in at the bottom, out to roll up.",
     focus: "Keep your weight over the middle of your feet, not your heels.",
     easier: "Bend your knees more and only go as far as feels comfortable.",
+    blend: true,
     poses: [STAND, { ...STAND, t: 42, u: -62, n: -96, a: [-92, -92], l: [-80, -100, 0] }],
   });
   ex("arm-arcs", "Arm Arcs", {
@@ -149,7 +155,7 @@
     breath: "Breathe out to curl up, in to lower.",
     focus: "Lift from your abdominals, not by pulling on your head. Keep the pelvis still.",
     easier: "Make the lift smaller and rest your head between reps.",
-    poses: [{ ...BENT, a: HANDS_HEAD }, { ...BENT, ...CURL, y: 10, a: HANDS_HEAD }],
+    poses: [{ ...BENT }, { ...BENT, ...CURL, y: 10 }],
   });
   ex("roll-up", "Roll Up", {
     type: "reps", reps: "5 slow reps", cyc: 8,
@@ -158,6 +164,7 @@
     breath: "Breathe in to lift the arms, out to roll up, in at the top, out to roll down.",
     focus: "No jerking or momentum – roll like a wheel, bone by bone.",
     easier: "Bend your knees and hold the backs of your thighs to help you up, or only roll halfway back.",
+    blend: true,
     poses: [
       { ...SUP, l: [0, 0, 90], a: [178, 178] },
       { t: 176, u: 124, n: 104, l: [0, 0, 90], a: [92, 82] },
@@ -278,6 +285,7 @@
     breath: "Breathe out to reach, in to return.",
     focus: "Keep the pelvis level, as if balancing a cup of tea on your back.",
     easier: "Slide the leg back along the mat without lifting the arm.",
+    blend: true,
     poses: [QUAD, { ...QUAD, a: [8, 8], A: QUAD.a, l: QUAD.l, L: [182, 182, 182] }],
   });
   ex("plank-forearm", "Forearm Plank", {
@@ -308,6 +316,8 @@
     breath: "Breathe out to lift, in at the top, out to roll down.",
     focus: "Weight on the shoulder blades, not the neck. Knees stay hip-width.",
     easier: "Lift halfway and lower; keep the movement small.",
+    in3d: "arms-out",
+    plant: "feet",
     poses: [{ ...BENT, anchor: "S", x: -50 }, { t: 214, u: 214, n: 180, y: 39, anchor: "S", x: -50, a: [0, 0], l: FEET }],
   });
   ex("single-leg-bridge", "Single Leg Bridge", {
@@ -317,6 +327,7 @@
     breath: "Breathe in to lower, out to lift.",
     focus: "Keep the hips level – don't let the lifted side drop.",
     easier: "Keep both feet down and just hold the bridge.",
+    in3d: "arms-out",
     poses: [
       { t: 214, u: 214, n: 180, y: 39, anchor: "S", x: -50, a: [0, 0], l: [34, 34, 34], L: FEET },
       { t: 200, u: 196, n: 180, y: 25, anchor: "S", x: -50, a: [0, 0], l: [22, 22, 22], L: FEET },
@@ -382,6 +393,7 @@
     breath: "Breathe out to lift, in to lower.",
     focus: "Work from the glute; don't arch the back or tip the hips.",
     easier: "Make the lift smaller.",
+    blend: true,
     poses: [{ ...QUAD, L: QUAD.l }, { ...QUAD, l: [176, 86, 176], L: QUAD.l }],
   });
   ex("squat", "Pilates Squat", {
@@ -391,6 +403,7 @@
     breath: "Breathe in to lower, out to stand.",
     focus: "Knees track over your toes; keep your chest open.",
     easier: "Only squat halfway, or hold onto a chair.",
+    plant: "feet",
     poses: [STAND, { ...STAND, t: 58, u: 62, n: 70, a: [-2, 0], l: [-20, -112, 0] }],
   });
   ex("lunge", "Split Squat", {
@@ -400,6 +413,7 @@
     breath: "Breathe in to lower, out to rise.",
     focus: "Torso stays upright; front knee stays over the ankle.",
     easier: "Make the movement smaller, or hold a wall.",
+    plant: "feet",
     poses: [
       { t: 90, u: 90, n: 90, y: 80, a: { to: ["P", 14, -8] }, l: { w: [32, 5], b: 1 }, L: { w: [-30, 12], b: 1, f: -32 } },
       { t: 90, u: 90, n: 90, y: 50, a: { to: ["P", 14, -8] }, l: { w: [32, 5], b: 1 }, L: { w: [-30, 12], b: 1, f: -32 } },
@@ -423,6 +437,7 @@
     breath: "Breathe in to lower, out to press up.",
     focus: "Keep your body in one line – the hips move with the chest.",
     easier: "Do it with your knees on the mat, or against a wall.",
+    plant: "hands feet",
     poses: [PLANK, { t: 6, u: 6, n: 10, y: 20, x: 88, l: [186, 186, -120], a: { w: [131, 4], b: -1 } }],
   });
   ex("tricep-dip", "Tricep Dips", {
@@ -432,9 +447,10 @@
     breath: "Breathe in to lower, out to press.",
     focus: "Shoulders stay down away from your ears; elbows point backwards.",
     easier: "Keep your bottom on the mat and just bend and straighten the arms.",
+    plant: "hands feet",
     poses: [
       { t: 135, u: 135, n: 120, y: 16, l: { w: [45, 5] }, a: { w: [-43, 4] } },
-      { t: 141, u: 141, n: 124, y: 10, l: { w: [45, 5] }, a: { w: [-43, 4] } },
+      { t: 141, u: 141, n: 124, y: 13, l: { w: [45, 5] }, a: { w: [-43, 4] } },
     ],
   });
   ex("reverse-tabletop", "Reverse Tabletop", {
@@ -453,7 +469,8 @@
     breath: "Breathe out to lift, in to lower.",
     focus: "Don't let the hips sway or the lower back sag.",
     easier: "Hold the plank only, or do it from a forearm plank.",
-    poses: [PLANK, { ...PLANK, l: [214, 214, 214], L: PLANK.l }],
+    blend: true,
+    poses: [PLANK, { ...PLANK, l: [186, 186, PLANK.l[2]], L: PLANK.l }],
   });
   ex("shoulder-taps", "Plank Shoulder Taps", {
     in3d: "shoulder-taps",
@@ -472,7 +489,8 @@
     breath: "Breathe out to pike up, in to lower.",
     focus: "Lift from the abdominals; keep the arms and legs long.",
     easier: "Bend your knees as you lift, or do a smaller lift.",
-    poses: [PLANK, { t: -44, u: -44, n: -64, y: 73, x: 60, l: [230, 230, 217], a: { w: [131, 4], b: -1 } }],
+    plant: "hands feet",
+    poses: [PLANK, { t: -44, u: -44, n: -64, y: 70, x: 68, l: [220, 220, 217], a: { w: [131, 4], b: -1 } }],
   });
   ex("swan", "Swan", {
     type: "reps", reps: "6 slow reps", cyc: 5,
@@ -481,6 +499,7 @@
     breath: "Breathe in to lift, out to lower.",
     focus: "Lift from the upper back, not by crunching the low back; keep the hips on the mat.",
     easier: "Only lift as far as the bottom of the ribs, or stay on your forearms.",
+    plant: "hands", plantFrom: 1, elbowsOut: true,
     poses: [
       { ...PRONE, y: 10, n: -6, a: { at: [60, -6], b: 1 } },
       { ...PRONE, y: 10, t: 4, u: 46, n: 34, a: { at: [60, -6], b: 1 } },
