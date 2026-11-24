@@ -586,10 +586,13 @@
     // An exercise's "plant" names the ends that keep the place and angle they have in its reference pose;
     // the rest of the limb bends to meet them, whatever the body does.
     const pins = new Map(), PIN_ENDS = { hands: ["hand", "lowerarm", "upperarm"], feet: ["foot", "calf", "thigh"] };
+    const PIN_SIDE = { handR: ["hands", "r"], handL: ["hands", "l"], footR: ["feet", "r"], footL: ["feet", "l"] }; // one side only
     function capturePins(spec, lie) {
       pose(Figure.resolve(spec.from), 0, lie);
       const rec = [];
-      for (const part of spec.plant) for (const [sd, o] of [["r", 1], ["l", -1]]) {
+      for (const name of spec.plant) for (const [sd, o] of [["r", 1], ["l", -1]]) {
+        const [part, only] = PIN_SIDE[name] || [name];
+        if (only && only !== sd) continue;
         const [e, l, u] = PIN_ENDS[part].map(n => bones[n + "_" + sd]), kids = [];
         e.traverse(c => { if (c !== e && c.isBone) kids.push([c, c.quaternion.clone()]); });
         rec.push({ part, o, u, l, e, kids, p: e.getWorldPosition(new THREE.Vector3()), q: e.getWorldQuaternion(new THREE.Quaternion()) });
@@ -818,6 +821,9 @@
         }
       },
       "arms-out"() { // bridges: both hands stay planted on the mat, 10 degrees out from the shoulders, while the hips move
+        // the head stays where it rests on the mat: the 3D spine doesn't match the 2D one, so holding the
+        // shoulders in 2D still lets the head slide as the hips lift (plant the feet so they hold too)
+        bones.Head.getWorldPosition(rT); root.position.x += -58.7 - rT.x; root.updateMatrixWorld(true);
         const reach = 39, c = Math.cos(rad(10)), s = Math.sin(rad(10));
         for (const [sd, o] of [["r", 1], ["l", -1]]) {
           rT.set(-41.4 + reach * c, 4, o * (14.4 + reach * s));

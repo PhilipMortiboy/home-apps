@@ -41,6 +41,7 @@
     focus: "Move one vertebra at a time. Keep weight even on both feet.",
     easier: "Only lift as far as your low back – a small tilt is enough.",
     in3d: "arms-out",
+    plant: "feet",
     poses: [{ ...BENT, anchor: "S", x: -50 }, { t: 205, u: 190, n: 180, y: 25, anchor: "S", x: -50, a: [0, 0], l: FEET }],
   });
   ex("cat-cow", "Cat-Cow", {
@@ -166,10 +167,12 @@
     easier: "Bend your knees and hold the backs of your thighs to help you up, or only roll halfway back.",
     blend: true,
     poses: [
-      { ...SUP, l: [0, 0, 90], a: [178, 178] },
-      { t: 176, u: 124, n: 104, l: [0, 0, 90], a: [92, 82] },
+      // lying, the legs tip down 1.5 degrees: the hips sit 2 cm lower once up on the sitting bones,
+      // so this keeps the knees and feet in the same place on the mat
+      { ...SUP, l: [-1.5, -1.5, 90], a: [178, 178] },
+      { t: 176, u: 124, n: 104, l: [-1.5, -1.5, 90], a: [92, 82] },
       { t: 78, u: 24, n: -12, l: [0, 0, 90], a: [6, 2] },
-      { t: 176, u: 124, n: 104, l: [0, 0, 90], a: [92, 82] },
+      { t: 176, u: 124, n: 104, l: [-1.5, -1.5, 90], a: [92, 82] },
     ],
   });
   ex("single-leg-stretch", "Single Leg Stretch", {
@@ -192,8 +195,9 @@
     focus: "Keep the curl of the upper body as the arms and legs stretch away.",
     easier: "Reach the legs higher towards the ceiling, or keep the arms by your sides.",
     poses: [
-      { ...CURL, l: [114, 12, 12], a: { to: ["Ak", -12, 0] } },
-      { ...CURL, l: [30, 30, 30], a: [160, 162] },
+      // the skin under the hips thickens as the thighs lower, so these angles keep the body's rise small
+      { ...CURL, l: [104, 12, 12], a: { to: ["Ak", -12, 0] } },
+      { ...CURL, l: [40, 40, 40], a: [160, 162] },
     ],
   });
   ex("single-straight-leg", "Single Straight Leg Stretch", {
@@ -329,6 +333,7 @@
     focus: "Keep the hips level – don't let the lifted side drop.",
     easier: "Keep both feet down and just hold the bridge.",
     in3d: "arms-out",
+    plant: "footL",
     poses: [
       { t: 214, u: 214, n: 180, y: 39, anchor: "S", x: -50, a: [0, 0], l: [34, 34, 34], L: FEET },
       { t: 200, u: 196, n: 180, y: 25, anchor: "S", x: -50, a: [0, 0], l: [22, 22, 22], L: FEET },
@@ -369,6 +374,7 @@
     breath: "Breathe in for one leg, out for the other.",
     focus: "Lift the belly gently away from the mat and keep the chest lifted.",
     easier: "Rest your forehead on your hands and kick slowly.",
+    blend: true,
     poses: [
       { ...PRONE, u: 40, n: 22, a: [-95, 0], l: [180, 42, 42], L: [180, 180, 180] },
       { ...PRONE, u: 40, n: 22, a: [-95, 0], l: [180, 180, 180], L: [180, 42, 42] },
@@ -502,7 +508,7 @@
     easier: "Only lift as far as the bottom of the ribs, or stay on your forearms.",
     plant: "hands", plantFrom: 1, elbowsOut: true,
     poses: [
-      { ...PRONE, y: 10, n: -6, a: { at: [60, -6], b: 1 } },
+      { ...PRONE, y: 10, t: 4, u: 2, n: -6, a: { at: [60, -6], b: 1 } }, // hips already down, so the legs don't drop as the chest lifts
       { ...PRONE, y: 10, t: 4, u: 46, n: 34, a: { at: [60, -6], b: 1 } },
     ],
   });
