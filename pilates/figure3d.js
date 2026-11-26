@@ -230,6 +230,37 @@
     return new Promise((ok, bad) => new THREE.GLTFLoader().parse(out.buffer, "", ok, bad));
   }
 
+  // The model paints the body's midriff (base_1) in the top's colour, and that patch reaches below the leggings'
+  // waistband. When the hips bend deeply (Knees to Chest, Rolling Like a Ball), the skin just above the waistband
+  // folds down over the hips and shows as white on the lower body. Colour the part under the waistband, and a
+  // little above it (high-waisted leggings), like the leggings. The waistband is read all round, as it dips at the
+  // front, and the line is drawn per pixel so it stays clean across the mesh's large triangles.
+  function legsUnderWaistband(body, legs, mat) {
+    if (!body || !legs) return;
+    const B = body.geometry.attributes.position, L = legs.geometry.attributes.position, BINS = 36, RISE = 0.06; // metres
+    let cx = 0, cz = 0, low = Infinity;
+    for (let i = 0; i < B.count; i++) { cx += B.getX(i); cz += B.getZ(i); low = Math.min(low, B.getY(i)); }
+    cx /= B.count; cz /= B.count;
+    const turn = (P, i) => (Math.atan2(P.getZ(i) - cz, P.getX(i) - cx) / (2 * Math.PI) + 0.5) * BINS; // 0..BINS round the body
+    const top = new Array(BINS).fill(-Infinity);
+    for (let i = 0; i < L.count; i++) if (L.getY(i) > low) { const k = Math.floor(turn(L, i)) % BINS; top[k] = Math.max(top[k], L.getY(i)); }
+    for (let k = 0; k < BINS; k++) if (top[k] === -Infinity) top[k] = Math.max(top[(k + BINS - 1) % BINS], top[(k + 1) % BINS]);
+    const waist = new Float32Array(B.count);
+    for (let i = 0; i < B.count; i++) {
+      const f = turn(B, i) - 0.5, k = Math.floor(f), w = f - k, at = top[(k + BINS) % BINS] * (1 - w) + top[(k + 1 + BINS) % BINS] * w;
+      waist[i] = B.getY(i) - at - RISE; // below 0 is leggings
+    }
+    body.geometry.setAttribute("waist", new THREE.BufferAttribute(waist, 1));
+    const m = body.material = mat.top.clone(), legColor = { value: mat.leggings.color };
+    m.onBeforeCompile = sh => {
+      sh.uniforms.legColor = legColor;
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float waist;\nvarying float vWaist;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWaist = waist;");
+      sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying float vWaist;\nuniform vec3 legColor;")
+        .replace("#include <color_fragment>", "#include <color_fragment>\nfloat wf = max(fwidth(vWaist), 1e-4);\ndiffuseColor.rgb = mix(legColor, diffuseColor.rgb, smoothstep(-wf, wf, vWaist));");
+    };
+  }
+
   // ---- the renderer, scene and rigged model (one of each, reused between exercises) ----
   function engine(gltf, tex) {
     const LEN = Figure.LEN, HR = 11, NECK = 6;
@@ -287,6 +318,7 @@
       if (o.isBone) bones[o.name] = o;
       if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; o.material = mat[o.material.name] || mat.skin; }
     });
+    legsUnderWaistband(model.getObjectByName("base_1"), model.getObjectByName("female_sportsuit01_1"), mat);
     root.updateMatrixWorld(true);
     const info = {};
     for (const name of Object.keys(DRIVE)) {
