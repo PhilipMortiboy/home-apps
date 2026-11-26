@@ -80,7 +80,7 @@
     breath: "Breathe slowly into your back and feel it widen.",
     focus: "Let your hips sink and your shoulders soften.",
     easier: "Put a cushion between your heels and hips, or under your forehead.",
-    poses: [{ t: -2, u: -14, n: -22, l: [-24, 180, 180], a: [-8, -3] }],
+    poses: [{ t: 12, u: -22, n: -22, l: [-24, 180, 180], a: [-16, -8] }], // back rises from the hips, so the chest rests on the thighs; hands on the mat
   });
   ex("knees-to-chest", "Knees to Chest", {
     type: "hold",
