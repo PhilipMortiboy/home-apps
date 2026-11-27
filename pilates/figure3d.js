@@ -685,9 +685,11 @@
     function restHands(r0, tw) {
       const j = joints(r0);
       if (tw.hips <= 0) return;
+      let moved = false;
       for (const [sd, Hd] of [["r", j.a.Hd], ["l", j.A.Hd]]) {
         const k = tw.hips * onBody(r0, j, Hd);
         if (k <= 0) continue;
+        moved = true;
         bones["upperarm_" + sd].getWorldPosition(rS); bones.spine_02.getWorldPosition(rC);
         const side = Math.sign(rS.z - rC.z) || 1, wx = rC.x - 3, wz = rC.z + side * 10;
         rF.set(0.45, 0, -side * 0.89).normalize();  // fingers towards the navel
@@ -697,6 +699,8 @@
         rF.y = (tw1 - tw0) / 12; rF.normalize();    // along the curve of the belly
         reachHand(sd, rT, rP.set(-0.15, -0.45, side * 0.88), rF, DOWN, k, 0.7); // elbow relaxed outwards and down
       }
+      // the elbows may have been the lowest point before the hands moved onto the body: lay the back down again
+      if (moved) { const m = measure(); root.position.y -= Math.min(...PARTS.map(p => m[p].y)); root.updateMatrixWorld(true); }
     }
     // two-bone reach in 3D: wrist to T, elbow towards the pole, fingers along F, palm facing N
     function reachHand(sd, T, pole, F, N, k, flat) {
