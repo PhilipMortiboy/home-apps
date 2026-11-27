@@ -903,9 +903,10 @@
 
   // ---- animation (as figure.js, plus a pause at each end, follow-through and breathing) ----
   const smoother = k => k * k * k * (k * (k * 6 - 15) + 10);
+  const HOLD = 0.12; // the share of each movement spent still at its starting key
   function beatAt(n, cyc, t) { // which key the movement is leaving, and how far towards the next
     const pos = ((t % cyc) + cyc) % cyc / cyc * n, i = Math.floor(pos);
-    return { i, k: smoother(Math.min(1, Math.max(0, (pos - i - 0.12) / 0.76))) };
+    return { i, k: smoother(Math.min(1, Math.max(0, (pos - i - HOLD) / (1 - 2 * HOLD)))) };
   }
   // Leg circles run at a steady speed, easing to a stop and back each time they change direction
   // after 5 circles. The beat is the position around the circle, a quarter turn per key.
@@ -927,8 +928,11 @@
     if (bg) bg.stop = true; // a lesson is starting: nothing else may move the figure
     const E = flat ? null : built;
     if (!E) return Figure.mount(el, ex, { mirror, paused }); // 3D didn't load: 2D for the whole lesson
-    let alive = true, isPaused = paused, raf = 0, t = 0, last = null;
     const keys = ex.poses.map(Figure.resolve), cyc = ex.cyc || 4;
+    // Start where the first movement begins, not in the hold before it, which kept slow exercises
+    // still for half a second after they appeared. The movement still eases in from rest.
+    let alive = true, isPaused = paused, raf = 0, last = null;
+    let t = keys.length > 1 && ex.in3d !== "leg-circles" ? HOLD * cyc / keys.length : 0;
     const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
     const still = keys[ex.key ?? (keys.length > 1 ? 1 : 0)];
     // arms trail slightly behind the body only when they aren't planted or holding something
